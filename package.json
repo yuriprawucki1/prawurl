@@ -1,0 +1,43 @@
+{
+  "name": "prawurl",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "lint": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "wrangler:types": "wrangler types --config wrangler.api.jsonc src/workers/api/worker-configuration.d.ts && wrangler types --config wrangler.redirect.jsonc src/workers/redirect/worker-configuration.d.ts",
+    "deploy:api": "wrangler deploy --config wrangler.api.jsonc",
+    "deploy:redirect": "wrangler deploy --config wrangler.redirect.jsonc",
+    "deploy:web": "npm run build && wrangler pages deploy dist --project-name prawurl-web",
+    "deploy": "npm run build && npm run deploy:api && npm run deploy:redirect && wrangler pages deploy dist --project-name prawurl-web"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.5.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.0",
+    "@cloudflare/workers-types": "latest",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8",
+    "wrangler": "^4.0.0"
+  }
+}

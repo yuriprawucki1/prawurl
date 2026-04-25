@@ -1,0 +1,52 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "prawurl-api",
+  "main": "src/workers/api/index.ts",
+  "compatibility_date": "2026-04-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "routes": [
+    {
+      "pattern": "api.prawurl.com/*",
+      "zone_name": "prawurl.com"
+    }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://app.prawurl.com",
+    "PUBLIC_ORIGIN": "https://prawurl.com",
+    "BOOTSTRAP_ADMIN_EMAIL": "yuriprawucki1@gmail.com",
+    "SESSION_COOKIE_NAME": "prawurl_session"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PRAWURL_LINKS",
+      "id": "7ed7b229a529421ca7c284f113588769"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "prawurl",
+      "database_id": "fbd6cd66-3f82-4072-9e18-fcdcd3be78d7",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "EVENTS",
+        "queue": "prawurl-events"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "prawurl-events",
+        "max_batch_size": 25,
+        "max_batch_timeout": 10
+      }
+    ]
+  }
+}

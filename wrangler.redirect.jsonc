@@ -1,0 +1,47 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "prawurl-redirect",
+  "main": "src/workers/redirect/index.ts",
+  "compatibility_date": "2026-04-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "routes": [
+    {
+      "pattern": "prawurl.com/*",
+      "zone_name": "prawurl.com"
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://prawurl.com"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PRAWURL_LINKS",
+      "id": "7ed7b229a529421ca7c284f113588769"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "prawurl",
+      "database_id": "fbd6cd66-3f82-4072-9e18-fcdcd3be78d7",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "EVENTS",
+        "queue": "prawurl-events"
+      }
+    ]
+  }
+}
