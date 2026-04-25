@@ -43,6 +43,12 @@ npx wrangler secret put TURNSTILE_SECRET_KEY --config wrangler.api.jsonc
 npx wrangler secret put LOG_HASH_SALT --config wrangler.redirect.jsonc
 ```
 
+The Turnstile site key is public and can be provided at build time:
+
+```bash
+VITE_TURNSTILE_SITE_KEY=your-site-key npm run build
+```
+
 OAuth callback URLs:
 
 - `https://api.prawurl.com/auth/google/callback`

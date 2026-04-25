@@ -21,7 +21,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   session: () => request<{ session: SessionUser | null }>("/auth/session"),
-  createLink: (input: CreateLinkInput) => request<{ link: LinkSummary }>("/links", { method: "POST", body: JSON.stringify(input) }),
+  createLink: (input: CreateLinkInput, turnstileToken: string | null) =>
+    request<{ link: LinkSummary }>("/links", {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers: turnstileToken ? { "x-turnstile-token": turnstileToken } : undefined
+    }),
   links: () => request<{ links: LinkSummary[] }>("/links"),
   logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
   adminSummary: () => request<{ summary: PlatformSummary }>("/admin/summary"),
@@ -31,3 +36,4 @@ export const api = {
 };
 
 export const authUrl = (provider: "google" | "github") => `${apiOrigin}/auth/${provider}`;
+export const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "0x4AAAAAADDQLq_t1QXGml-u";

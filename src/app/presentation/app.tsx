@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type * as React from "react";
 import { Activity, BarChart3, Command, Github, LayoutDashboard, LinkIcon, Lock, LogOut, Shield, Users } from "lucide-react";
-import { api, authUrl } from "../lib/api";
+import { api, authUrl, turnstileSiteKey } from "../lib/api";
 import type { AuditLog, LinkSummary, PlatformSummary, SessionUser, User } from "../../shared/contracts";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -181,6 +181,7 @@ function LinksView() {
   const [destinationUrl, setDestinationUrl] = useState("");
   const [alias, setAlias] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const refresh = () => api.links().then(({ links }) => setLinks(links));
 
@@ -192,9 +193,10 @@ function LinksView() {
     event.preventDefault();
     setError(null);
     try {
-      await api.createLink({ destinationUrl, alias: alias || undefined });
+      await api.createLink({ destinationUrl, alias: alias || undefined }, turnstileToken);
       setDestinationUrl("");
       setAlias("");
+      setTurnstileToken(null);
       refresh();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Erro ao criar link");
@@ -223,12 +225,51 @@ function LinksView() {
               Criar
             </Button>
           </form>
+          <Turnstile onToken={setTurnstileToken} />
           {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
         </CardContent>
       </Card>
       <LinksTable links={links} />
     </section>
   );
+}
+
+function Turnstile({ onToken }: { onToken: (token: string | null) => void }) {
+  const elementId = "prawurl-turnstile";
+
+  useEffect(() => {
+    if (!turnstileSiteKey) {
+      return;
+    }
+
+    const render = () => {
+      const target = document.getElementById(elementId);
+      const turnstile = window.turnstile;
+      if (!target || !turnstile || target.dataset.rendered === "true") {
+        return;
+      }
+      turnstile.render(target, {
+        sitekey: turnstileSiteKey,
+        callback: (token) => onToken(token),
+        "expired-callback": () => onToken(null),
+        "error-callback": () => onToken(null)
+      });
+      target.dataset.rendered = "true";
+    };
+
+    if (!document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')) {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+      script.async = true;
+      script.defer = true;
+      script.onload = render;
+      document.head.appendChild(script);
+    } else {
+      render();
+    }
+  }, [onToken]);
+
+  return <div id={elementId} className="mt-4 min-h-16" />;
 }
 
 function AnalyticsView() {
