@@ -13,6 +13,7 @@ class MemoryAliases implements AliasRepository {
 describe("AliasPolicy", () => {
   it("normalizes valid aliases", async () => {
     await expect(new AliasPolicy(new MemoryAliases([])).validate("Launch-01")).resolves.toBe("launch-01");
+    await expect(new AliasPolicy(new MemoryAliases([])).validate("cv")).resolves.toBe("cv");
   });
 
   it("rejects reserved aliases", async () => {

@@ -14,7 +14,7 @@ import type {
 } from "../shared/contracts";
 
 export interface LinkRepository {
-  create(ownerId: string, input: Required<CreateLinkInput> & { alias: string; id: string; now: string }): Promise<Link>;
+  create(ownerId: string, input: CreateLinkInput & { alias: string; id: string; now: string; destinationUrl: string; redirectCode: 301 | 302 }): Promise<Link>;
   findByAlias(alias: string): Promise<Link | null>;
   findById(id: string): Promise<Link | null>;
   listByOwner(ownerId: string): Promise<LinkSummary[]>;

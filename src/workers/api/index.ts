@@ -17,6 +17,7 @@ import { KvRedirectCache } from "../../infrastructure/kv-redirect-cache";
 import { authorizationUrl, exchangeOAuthCode } from "../../infrastructure/oauth";
 import { verifyTurnstile } from "../../infrastructure/turnstile";
 import type { AppEvent, OAuthProvider, UserStatus, UserRole } from "../../shared/contracts";
+import { ZodError } from "zod";
 
 interface Env {
   DB: D1Database;
@@ -39,15 +40,15 @@ const providers = new Set(["google", "github"]);
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (request.method === "OPTIONS") {
-      return withCors(new Response(null, { status: 204 }), env);
+      return withCors(new Response(null, { status: 204 }), env, request);
     }
 
     try {
       const response = await handleRequest(request, env, ctx);
-      return withCors(response, env);
+      return withCors(response, env, request);
     } catch (error) {
       console.error(JSON.stringify({ level: "error", message: "api.request_failed", error: errorMessage(error) }));
-      return withCors(json({ error: errorMessage(error) }, statusForError(error)), env);
+      return withCors(json({ error: errorMessage(error) }, statusForError(error)), env, request);
     }
   },
 
@@ -324,12 +325,15 @@ function redirect(location: string, status = 302, headers?: HeadersInit): Respon
   return new Response(null, { status, headers: { location, ...headers } });
 }
 
-function withCors(response: Response, env: Env): Response {
+function withCors(response: Response, env: Env, request: Request): Response {
   const headers = new Headers(response.headers);
-  headers.set("access-control-allow-origin", env.APP_ORIGIN);
+  const requestOrigin = request.headers.get("origin");
+  const allowedOrigin = requestOrigin === env.PUBLIC_ORIGIN || requestOrigin === env.APP_ORIGIN ? requestOrigin : env.APP_ORIGIN;
+  headers.set("access-control-allow-origin", allowedOrigin);
   headers.set("access-control-allow-credentials", "true");
   headers.set("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
   headers.set("access-control-allow-headers", "content-type,x-turnstile-token");
+  headers.append("vary", "Origin");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -400,5 +404,8 @@ function statusForError(error: unknown): number {
 }
 
 function errorMessage(error: unknown): string {
+  if (error instanceof ZodError) {
+    return error.issues[0]?.message ?? "Dados inválidos.";
+  }
   return error instanceof Error ? error.message : "UNKNOWN_ERROR";
 }

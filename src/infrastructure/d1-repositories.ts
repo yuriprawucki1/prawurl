@@ -26,6 +26,7 @@ type LinkRow = {
   alias: string;
   destination_url: string;
   title: string | null;
+  tags_json: string;
   status: LinkStatus;
   expires_at: string | null;
   redirect_code: 301 | 302;
@@ -61,10 +62,21 @@ export class D1LinkRepository implements LinkRepository {
   async create(ownerId: string, input: Parameters<LinkRepository["create"]>[1]): Promise<Link> {
     await this.db
       .prepare(
-        `INSERT INTO links (id, owner_id, alias, destination_url, title, status, expires_at, redirect_code, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`
+        `INSERT INTO links (id, owner_id, alias, destination_url, title, tags_json, status, expires_at, redirect_code, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`
       )
-      .bind(input.id, ownerId, input.alias, input.destinationUrl, input.title || null, input.expiresAt, input.redirectCode, input.now, input.now)
+      .bind(
+        input.id,
+        ownerId,
+        input.alias,
+        input.destinationUrl,
+        input.title || null,
+        JSON.stringify(input.tags ?? []),
+        input.expiresAt ?? null,
+        input.redirectCode,
+        input.now,
+        input.now
+      )
       .run();
 
     const link = await this.findById(input.id);
@@ -346,12 +358,25 @@ function mapLink(row: LinkRow): Link {
     alias: row.alias,
     destinationUrl: row.destination_url,
     title: row.title,
+    tags: parseTags(row.tags_json),
     status: row.status,
     expiresAt: row.expires_at,
     redirectCode: row.redirect_code,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function parseTags(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function mapUser(row: UserRow): User {

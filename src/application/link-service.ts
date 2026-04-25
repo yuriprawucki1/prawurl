@@ -28,6 +28,7 @@ export class LinkService {
       alias,
       destinationUrl,
       title: parsed.title ?? "",
+      tags: parsed.tags ?? [],
       expiresAt: parsed.expiresAt ?? null,
       redirectCode: parsed.redirectCode ?? 302,
       now

@@ -21,6 +21,7 @@ export interface Link {
   alias: string;
   destinationUrl: string;
   title: string | null;
+  tags: string[];
   status: LinkStatus;
   expiresAt: string | null;
   redirectCode: 301 | 302;
@@ -36,6 +37,7 @@ export interface CreateLinkInput {
   destinationUrl: string;
   alias?: string;
   title?: string;
+  tags?: string[];
   expiresAt?: string | null;
   redirectCode?: 301 | 302;
 }

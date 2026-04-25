@@ -46,6 +46,9 @@ export const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "0x4A
 
 function errorLabel(error: unknown): string {
   const code = String(error);
+  if (code.includes("String must contain at least") || code.includes("caracter")) {
+    return "O alias precisa ter pelo menos 2 caracteres.";
+  }
   const labels: Record<string, string> = {
     TURNSTILE_TOKEN_MISSING: "Confirme o desafio de segurança antes de criar o link.",
     TURNSTILE_INVALID: "O desafio de segurança expirou. Tente novamente.",

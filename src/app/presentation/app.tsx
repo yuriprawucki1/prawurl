@@ -3,8 +3,9 @@ import type * as React from "react";
 import {
   Activity,
   BarChart3,
-  ChevronLeft,
-  ChevronRight,
+  BookOpen,
+  Building2,
+  ChevronsUpDown,
   Command,
   Github,
   LayoutDashboard,
@@ -12,11 +13,15 @@ import {
   Lock,
   LogOut,
   Moon,
+  PanelLeft,
+  QrCode,
+  Settings,
   Shield,
   Sun,
-  UserCircle,
+  Tags,
   Users
 } from "lucide-react";
+import QRCode from "qrcode";
 import { api, authUrl, turnstileSiteKey } from "../lib/api";
 import type { AuditLog, LinkSummary, PlatformSummary, SessionUser, User } from "../../shared/contracts";
 import { Button } from "../components/ui/button";
@@ -90,7 +95,7 @@ function MarketingPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: 
             <Badge className="mb-5 border-primary/20 bg-primary/10 text-primary">Links curtos com controle de plataforma</Badge>
             <h1 className="text-5xl font-semibold leading-tight tracking-normal md:text-6xl">PrawURL</h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
-              Encurte, organize e audite links em uma plataforma feita para velocidade de edge, login social, analytics e governanca.
+              Encurte, organize e audite links em uma plataforma feita para velocidade de edge, login social, analytics e governança.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="default" onClick={() => (window.location.href = "https://app.prawurl.com/app")}>
@@ -106,9 +111,9 @@ function MarketingPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: 
 
           <div className="grid gap-4">
             {[
-              ["Redirect rapido", "KV resolve aliases no edge; D1 fica como fonte de verdade."],
-              ["Auditoria completa", "Auth, CRUD, admin, redirects, erros e seguranca em logs estruturados."],
-              ["Admin nativo", "Usuarios, links globais, bloqueios, flags e metricas da plataforma."]
+              ["Redirect rápido", "KV resolve aliases no edge; D1 fica como fonte de verdade."],
+              ["Auditoria completa", "Auth, CRUD, admin, redirects, erros e segurança em logs estruturados."],
+              ["Admin nativo", "Usuários, links globais, bloqueios, flags e métricas da plataforma."]
             ].map(([title, description]) => (
               <Card key={title}>
                 <CardHeader>
@@ -138,7 +143,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
   }, []);
 
   if (loading) {
-    return <FullScreenMessage title="Carregando" description="Preparando sua sessao." />;
+    return <FullScreenMessage title="Carregando" description="Preparando sua sessão." />;
   }
 
   if (!session) {
@@ -149,17 +154,19 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
     <div className="flex min-h-screen bg-background">
       <Sidebar collapsed={sidebarCollapsed}>
         <SidebarHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <LinkIcon className="h-5 w-5" />
+          <div className="flex items-center gap-3 rounded-md p-2">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Building2 className="h-5 w-5" />
             </div>
             <div className={sidebarCollapsed ? "sr-only" : "min-w-0"}>
               <div className="font-semibold">PrawURL</div>
-              <div className="text-xs text-muted-foreground">{session.user.email}</div>
+              <div className="text-xs text-muted-foreground">Workspace</div>
             </div>
+            {!sidebarCollapsed && <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground" />}
           </div>
         </SidebarHeader>
         <SidebarContent>
+          {!sidebarCollapsed && <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Plataforma</div>}
           <SidebarMenu>
             <NavButton active={view === "links"} onClick={() => setView("links")} icon={<LinkIcon />}>
               {!sidebarCollapsed && "Links"}
@@ -177,27 +184,34 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
                 </NavButton>
               </>
             )}
+            <NavButton active={false} onClick={() => undefined} icon={<BookOpen />}>
+              {!sidebarCollapsed && "Documentação"}
+            </NavButton>
+            <NavButton active={false} onClick={() => undefined} icon={<Settings />}>
+              {!sidebarCollapsed && "Configurações"}
+            </NavButton>
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <div className="mb-3 flex items-center gap-3 rounded-md border bg-background p-2">
-            <UserCircle className="h-8 w-8 shrink-0 text-muted-foreground" />
+          <div className="mb-3 flex items-center gap-3 rounded-md bg-muted p-2">
+            <Avatar user={session.user} />
             <div className={sidebarCollapsed ? "sr-only" : "min-w-0 flex-1"}>
               <div className="truncate text-sm font-medium">{session.user.name ?? session.user.email}</div>
-              <div className="truncate text-xs text-muted-foreground">{session.user.role}</div>
+              <div className="truncate text-xs text-muted-foreground">{session.user.email}</div>
             </div>
+            {!sidebarCollapsed && <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />}
           </div>
           <div className="grid gap-2">
             <ThemeToggle theme={theme} onToggle={onToggleTheme} collapsed={sidebarCollapsed} />
             <Button variant="outline" className="w-full" onClick={() => setSidebarCollapsed((value) => !value)}>
-              {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              <PanelLeft className="h-4 w-4" />
               {!sidebarCollapsed && "Recolher"}
             </Button>
           </div>
           <Button
             variant="outline"
             className="mt-2 w-full"
-            onClick={() => api.logout().then(() => window.location.reload())}
+            onClick={() => api.logout().finally(() => (window.location.href = "https://prawurl.com"))}
           >
             <LogOut className="h-4 w-4" />
             {!sidebarCollapsed && "Sair"}
@@ -241,6 +255,8 @@ function LinksView() {
   const [links, setLinks] = useState<LinkSummary[]>([]);
   const [destinationUrl, setDestinationUrl] = useState("");
   const [alias, setAlias] = useState("");
+  const [title, setTitle] = useState("");
+  const [tags, setTags] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -256,9 +272,19 @@ function LinksView() {
     setError(null);
     setSubmitting(true);
     try {
-      await api.createLink({ destinationUrl, alias: alias || undefined }, turnstileToken);
+      await api.createLink(
+        {
+          destinationUrl,
+          alias: alias || undefined,
+          title: title || undefined,
+          tags: parseTags(tags)
+        },
+        turnstileToken
+      );
       setDestinationUrl("");
       setAlias("");
+      setTitle("");
+      setTags("");
       setTurnstileToken(null);
       refresh();
     } catch (error) {
@@ -283,12 +309,20 @@ function LinksView() {
               <Input id="destination" value={destinationUrl} onChange={(event) => setDestinationUrl(event.target.value)} placeholder="https://..." />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="alias">Alias</Label>
+              <Label htmlFor="alias">Alias opcional</Label>
               <Input id="alias" value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="minha-url" />
             </div>
             <Button className="self-end" type="submit" disabled={submitting}>
               {submitting ? "Criando" : "Criar"}
             </Button>
+            <div className="grid gap-2 md:col-span-2">
+              <Label htmlFor="title">Título opcional</Label>
+              <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Meu link importante" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tags">Tags opcionais</Label>
+              <Input id="tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="portfolio, pessoal" />
+            </div>
           </form>
           <Turnstile onToken={setTurnstileToken} />
           {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
@@ -374,10 +408,10 @@ function AdminView() {
 
   return (
     <section className="grid gap-6">
-      <PageTitle title="Admin" description="Operacao da plataforma, usuarios, links globais e governanca." />
+      <PageTitle title="Admin" description="Operação da plataforma, usuários, links globais e governança." />
       {summary && (
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricCard title="Usuarios" value={summary.users} />
+          <MetricCard title="Usuários" value={summary.users} />
           <MetricCard title="Links" value={summary.links} />
           <MetricCard title="Cliques" value={summary.clicks} />
           <MetricCard title="Auditoria" value={summary.auditEvents} />
@@ -387,7 +421,7 @@ function AdminView() {
         <TabsList>
           <TabsTrigger active={tab === "users"} onClick={() => setTab("users")}>
             <Users className="mr-2 h-4 w-4" />
-            Usuarios
+            Usuários
           </TabsTrigger>
           <TabsTrigger active={tab === "links"} onClick={() => setTab("links")}>
             <LinkIcon className="mr-2 h-4 w-4" />
@@ -405,8 +439,8 @@ function UsersTable({ users }: { users: User[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Usuarios recentes</CardTitle>
-        <CardDescription>Status, papeis e cadastros da plataforma.</CardDescription>
+        <CardTitle>Usuários recentes</CardTitle>
+        <CardDescription>Status, papéis e cadastros da plataforma.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -442,14 +476,14 @@ function AuditLogsView() {
 
   return (
     <section className="grid gap-6">
-      <PageTitle title="Auditoria" description="Eventos persistentes de auth, CRUD, admin e seguranca." />
+      <PageTitle title="Auditoria" description="Eventos persistentes de auth, CRUD, admin e segurança." />
       <Card>
         <CardContent className="pt-6">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Quando</TableHead>
-                <TableHead>Acao</TableHead>
+                <TableHead>Ação</TableHead>
                 <TableHead>Entidade</TableHead>
                 <TableHead>Severidade</TableHead>
               </TableRow>
@@ -486,15 +520,33 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
               <TableHead>Destino</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Cliques</TableHead>
+              <TableHead>Tags</TableHead>
+              <TableHead>QR Code</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {links.map((link) => (
               <TableRow key={link.id}>
-                <TableCell className="font-medium">prawurl.com/{link.alias}</TableCell>
+                <TableCell className="font-medium">
+                  <div>prawurl.com/{link.alias}</div>
+                  {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
+                </TableCell>
                 <TableCell className="max-w-xl truncate">{link.destinationUrl}</TableCell>
                 <TableCell><Badge>{link.status}</Badge></TableCell>
                 <TableCell>{link.clickCount}</TableCell>
+                <TableCell>
+                  <div className="flex max-w-48 flex-wrap gap-1">
+                    {link.tags.map((tag) => (
+                      <Badge key={tag} className="gap-1">
+                        <Tags className="h-3 w-3" />
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <QrPreview value={`https://prawurl.com/${link.alias}`} />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -502,6 +554,44 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
       </CardContent>
     </Card>
   );
+}
+
+function QrPreview({ value }: { value: string }) {
+  const [src, setSrc] = useState<string>("");
+
+  useEffect(() => {
+    QRCode.toDataURL(value, { margin: 1, width: 96, errorCorrectionLevel: "M" })
+      .then(setSrc)
+      .catch(() => setSrc(""));
+  }, [value]);
+
+  return (
+    <div className="flex h-16 w-16 items-center justify-center rounded-md border bg-background">
+      {src ? <img src={src} alt={`QR Code para ${value}`} className="h-14 w-14" /> : <QrCode className="h-5 w-5 text-muted-foreground" />}
+    </div>
+  );
+}
+
+function Avatar({ user }: { user: User }) {
+  const fallback = (user.name ?? user.email).slice(0, 2).toUpperCase();
+
+  if (user.avatarUrl) {
+    return <img src={user.avatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" referrerPolicy="no-referrer" />;
+  }
+
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+      {fallback}
+    </div>
+  );
+}
+
+function parseTags(value: string): string[] {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 10);
 }
 
 function NavButton({ icon, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: React.ReactElement; active?: boolean }) {
@@ -550,11 +640,11 @@ function StatusPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () 
       <Card className="w-full max-w-xl">
         <CardHeader>
           <Badge className={status === "online" ? "w-fit border-primary/20 bg-primary/10 text-primary" : "w-fit"}>
-            {status === "checking" ? "Verificando" : status === "online" ? "API operacional" : "API indisponivel"}
+            {status === "checking" ? "Verificando" : status === "online" ? "API operacional" : "API indisponível"}
           </Badge>
           <CardTitle className="pt-4">Status do PrawURL</CardTitle>
           <CardDescription>
-            Esta pagina consulta o health check da API e mostra um estado legivel para operacao.
+            Esta página consulta o health check da API e mostra um estado legível para operação.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex gap-3">

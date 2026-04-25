@@ -2,9 +2,9 @@ import { z } from "zod";
 
 export const aliasSchema = z
   .string()
-  .min(3)
+  .min(2, "O alias precisa ter pelo menos 2 caracteres.")
   .max(48)
-  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, "Use letters, numbers, dashes or underscores.");
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, "Use letras, números, hífens ou underscores.");
 
 export const destinationUrlSchema = z
   .string()
@@ -12,12 +12,13 @@ export const destinationUrlSchema = z
   .refine((value) => {
     const protocol = new URL(value).protocol;
     return protocol === "https:" || protocol === "http:";
-  }, "Only http and https URLs are supported.");
+  }, "Apenas URLs http e https são suportadas.");
 
 export const createLinkSchema = z.object({
   destinationUrl: destinationUrlSchema,
   alias: aliasSchema.optional(),
   title: z.string().trim().min(1).max(120).optional(),
+  tags: z.array(z.string().trim().min(1).max(32)).max(10).optional(),
   expiresAt: z.string().datetime().nullable().optional(),
   redirectCode: z.union([z.literal(301), z.literal(302)]).optional()
 });
