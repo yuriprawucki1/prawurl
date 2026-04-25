@@ -3,17 +3,23 @@ import type { CreateLinkInput, LinkSummary, PlatformSummary, SessionUser, User, 
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "https://api.prawurl.com";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiOrigin}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      ...init?.headers
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiOrigin}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        ...init?.headers
+      }
+    });
+  } catch {
+    throw new Error("Não foi possível conectar à API. Verifique sua conexão e tente novamente.");
+  }
 
   if (!response.ok) {
-    throw new Error((await response.json().catch(() => ({ error: "REQUEST_FAILED" }))).error);
+    const body = await response.json().catch(() => ({ error: "REQUEST_FAILED" }));
+    throw new Error(errorLabel(body.error));
   }
 
   return response.json() as Promise<T>;
@@ -37,3 +43,17 @@ export const api = {
 
 export const authUrl = (provider: "google" | "github") => `${apiOrigin}/auth/${provider}`;
 export const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "0x4AAAAAADDQLq_t1QXGml-u";
+
+function errorLabel(error: unknown): string {
+  const code = String(error);
+  const labels: Record<string, string> = {
+    TURNSTILE_TOKEN_MISSING: "Confirme o desafio de segurança antes de criar o link.",
+    TURNSTILE_INVALID: "O desafio de segurança expirou. Tente novamente.",
+    ALIAS_TAKEN: "Esse alias já está em uso.",
+    ALIAS_RESERVED: "Esse alias é reservado.",
+    DESTINATION_BLOCKED: "Esse domínio está bloqueado.",
+    DESTINATION_SELF_REFERENTIAL: "Use uma URL de destino fora do PrawURL.",
+    UNAUTHENTICATED: "Sua sessão expirou. Entre novamente."
+  };
+  return labels[code] ?? code;
+}

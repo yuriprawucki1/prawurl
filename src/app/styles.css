@@ -21,6 +21,28 @@
   --input: 214 20% 84%;
   --ring: 168 82% 27%;
   --radius: 0.5rem;
+  color-scheme: light;
+}
+
+.dark {
+  --background: 222 30% 8%;
+  --foreground: 210 20% 96%;
+  --card: 222 26% 11%;
+  --card-foreground: 210 20% 96%;
+  --primary: 168 76% 42%;
+  --primary-foreground: 220 30% 8%;
+  --secondary: 219 20% 18%;
+  --secondary-foreground: 210 20% 96%;
+  --muted: 219 20% 18%;
+  --muted-foreground: 215 16% 72%;
+  --accent: 38 90% 58%;
+  --accent-foreground: 220 30% 8%;
+  --destructive: 0 68% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 18% 22%;
+  --input: 220 18% 22%;
+  --ring: 168 76% 42%;
+  color-scheme: dark;
 }
 
 * {

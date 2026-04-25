@@ -1,8 +1,18 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
 
-export function Sidebar({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
-  return <aside className={cn("flex min-h-screen w-72 flex-col border-r bg-card", className)} {...props} />;
+export function Sidebar({ className, collapsed, ...props }: React.HTMLAttributes<HTMLElement> & { collapsed?: boolean }) {
+  return (
+    <aside
+      className={cn(
+        "sticky top-0 flex h-screen shrink-0 flex-col border-r bg-card transition-[width] duration-200",
+        collapsed ? "w-[4.75rem]" : "w-72",
+        className
+      )}
+      data-collapsed={collapsed ? "true" : "false"}
+      {...props}
+    />
+  );
 }
 
 export function SidebarHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -10,7 +20,7 @@ export function SidebarHeader({ className, ...props }: React.HTMLAttributes<HTML
 }
 
 export function SidebarContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex-1 p-3", className)} {...props} />;
+  return <div className={cn("flex-1 overflow-y-auto p-3", className)} {...props} />;
 }
 
 export function SidebarFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

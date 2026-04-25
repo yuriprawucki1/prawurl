@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import type * as React from "react";
-import { Activity, BarChart3, Command, Github, LayoutDashboard, LinkIcon, Lock, LogOut, Shield, Users } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Command,
+  Github,
+  LayoutDashboard,
+  LinkIcon,
+  Lock,
+  LogOut,
+  Moon,
+  Shield,
+  Sun,
+  UserCircle,
+  Users
+} from "lucide-react";
 import { api, authUrl, turnstileSiteKey } from "../lib/api";
 import type { AuditLog, LinkSummary, PlatformSummary, SessionUser, User } from "../../shared/contracts";
 import { Button } from "../components/ui/button";
@@ -13,19 +29,46 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 
 type View = "links" | "analytics" | "admin" | "logs" | "settings";
+type Theme = "light" | "dark";
+type AdminTab = "users" | "links";
+
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+    const stored = window.localStorage.getItem("prawurl-theme");
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    window.localStorage.setItem("prawurl-theme", theme);
+  }, [theme]);
+
+  return { theme, toggleTheme: () => setTheme((current) => (current === "dark" ? "light" : "dark")) };
+}
 
 export function App() {
   const host = window.location.hostname;
   const path = window.location.pathname;
+  const { theme, toggleTheme } = useTheme();
 
   if (host === "app.prawurl.com" || path.startsWith("/app")) {
-    return <DashboardApp />;
+    return <DashboardApp theme={theme} onToggleTheme={toggleTheme} />;
   }
 
-  return <MarketingPage />;
+  if (path === "/status") {
+    return <StatusPage theme={theme} onToggleTheme={toggleTheme} />;
+  }
+
+  return <MarketingPage theme={theme} onToggleTheme={toggleTheme} />;
 }
 
-function MarketingPage() {
+function MarketingPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8">
@@ -36,7 +79,10 @@ function MarketingPage() {
             </div>
             <span className="text-lg font-semibold">PrawURL</span>
           </div>
-          <Button onClick={() => (window.location.href = "https://app.prawurl.com/app")}>Entrar</Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+            <Button onClick={() => (window.location.href = "https://app.prawurl.com/app")}>Entrar</Button>
+          </div>
         </header>
 
         <div className="grid flex-1 items-center gap-12 py-12 lg:grid-cols-[1.08fr_0.92fr]">
@@ -51,7 +97,7 @@ function MarketingPage() {
                 <LayoutDashboard className="h-4 w-4" />
                 Abrir dashboard
               </Button>
-              <Button variant="outline" onClick={() => (window.location.href = "https://api.prawurl.com/health")}>
+              <Button variant="outline" onClick={() => (window.location.href = "/status")}>
                 <Activity className="h-4 w-4" />
                 Status da API
               </Button>
@@ -78,10 +124,11 @@ function MarketingPage() {
   );
 }
 
-function DashboardApp() {
+function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const [session, setSession] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("links");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     api
@@ -99,14 +146,14 @@ function DashboardApp() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar>
+    <div className="flex min-h-screen bg-background">
+      <Sidebar collapsed={sidebarCollapsed}>
         <SidebarHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <LinkIcon className="h-5 w-5" />
             </div>
-            <div>
+            <div className={sidebarCollapsed ? "sr-only" : "min-w-0"}>
               <div className="font-semibold">PrawURL</div>
               <div className="text-xs text-muted-foreground">{session.user.email}</div>
             </div>
@@ -115,35 +162,49 @@ function DashboardApp() {
         <SidebarContent>
           <SidebarMenu>
             <NavButton active={view === "links"} onClick={() => setView("links")} icon={<LinkIcon />}>
-              Links
+              {!sidebarCollapsed && "Links"}
             </NavButton>
             <NavButton active={view === "analytics"} onClick={() => setView("analytics")} icon={<BarChart3 />}>
-              Analytics
+              {!sidebarCollapsed && "Analytics"}
             </NavButton>
             {session.user.role === "admin" && (
               <>
                 <NavButton active={view === "admin"} onClick={() => setView("admin")} icon={<Shield />}>
-                  Admin
+                  {!sidebarCollapsed && "Admin"}
                 </NavButton>
                 <NavButton active={view === "logs"} onClick={() => setView("logs")} icon={<Command />}>
-                  Auditoria
+                  {!sidebarCollapsed && "Auditoria"}
                 </NavButton>
               </>
             )}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
+          <div className="mb-3 flex items-center gap-3 rounded-md border bg-background p-2">
+            <UserCircle className="h-8 w-8 shrink-0 text-muted-foreground" />
+            <div className={sidebarCollapsed ? "sr-only" : "min-w-0 flex-1"}>
+              <div className="truncate text-sm font-medium">{session.user.name ?? session.user.email}</div>
+              <div className="truncate text-xs text-muted-foreground">{session.user.role}</div>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <ThemeToggle theme={theme} onToggle={onToggleTheme} collapsed={sidebarCollapsed} />
+            <Button variant="outline" className="w-full" onClick={() => setSidebarCollapsed((value) => !value)}>
+              {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              {!sidebarCollapsed && "Recolher"}
+            </Button>
+          </div>
           <Button
             variant="outline"
-            className="w-full"
+            className="mt-2 w-full"
             onClick={() => api.logout().then(() => window.location.reload())}
           >
             <LogOut className="h-4 w-4" />
-            Sair
+            {!sidebarCollapsed && "Sair"}
           </Button>
         </SidebarFooter>
       </Sidebar>
-      <main className="flex-1 p-8">
+      <main className="min-w-0 flex-1 overflow-x-hidden p-6 md:p-8">
         {view === "links" && <LinksView />}
         {view === "analytics" && <AnalyticsView />}
         {view === "admin" && session.user.role === "admin" && <AdminView />}
@@ -182,8 +243,9 @@ function LinksView() {
   const [alias, setAlias] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const refresh = () => api.links().then(({ links }) => setLinks(links));
+  const refresh = () => api.links().then(({ links }) => setLinks(links)).catch((error) => setError(error instanceof Error ? error.message : "Erro ao carregar links."));
 
   useEffect(() => {
     refresh();
@@ -192,6 +254,7 @@ function LinksView() {
   async function createLink(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setSubmitting(true);
     try {
       await api.createLink({ destinationUrl, alias: alias || undefined }, turnstileToken);
       setDestinationUrl("");
@@ -200,6 +263,8 @@ function LinksView() {
       refresh();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Erro ao criar link");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -221,8 +286,8 @@ function LinksView() {
               <Label htmlFor="alias">Alias</Label>
               <Input id="alias" value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="minha-url" />
             </div>
-            <Button className="self-end" type="submit">
-              Criar
+            <Button className="self-end" type="submit" disabled={submitting}>
+              {submitting ? "Criando" : "Criar"}
             </Button>
           </form>
           <Turnstile onToken={setTurnstileToken} />
@@ -296,11 +361,15 @@ function AdminView() {
   const [summary, setSummary] = useState<PlatformSummary | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [links, setLinks] = useState<LinkSummary[]>([]);
+  const [tab, setTab] = useState<AdminTab>("users");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.adminSummary().then(({ summary }) => setSummary(summary));
-    api.adminUsers().then(({ users }) => setUsers(users));
-    api.adminLinks().then(({ links }) => setLinks(links));
+    Promise.all([
+      api.adminSummary().then(({ summary }) => setSummary(summary)),
+      api.adminUsers().then(({ users }) => setUsers(users)),
+      api.adminLinks().then(({ links }) => setLinks(links))
+    ]).catch((error) => setError(error instanceof Error ? error.message : "Erro ao carregar admin."));
   }, []);
 
   return (
@@ -316,46 +385,52 @@ function AdminView() {
       )}
       <Tabs>
         <TabsList>
-          <TabsTrigger active>
+          <TabsTrigger active={tab === "users"} onClick={() => setTab("users")}>
             <Users className="mr-2 h-4 w-4" />
             Usuarios
           </TabsTrigger>
-          <TabsTrigger>
+          <TabsTrigger active={tab === "links"} onClick={() => setTab("links")}>
             <LinkIcon className="mr-2 h-4 w-4" />
             Links globais
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Card>
-        <CardHeader>
-          <CardTitle>Usuarios recentes</CardTitle>
-          <CardDescription>Status, papeis e cadastros da plataforma.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell><Badge>{user.role}</Badge></TableCell>
-                  <TableCell>{user.status}</TableCell>
-                  <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      <LinksTable links={links} />
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {tab === "users" ? <UsersTable users={users} /> : <LinksTable links={links} />}
     </section>
+  );
+}
+
+function UsersTable({ users }: { users: User[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Usuarios recentes</CardTitle>
+        <CardDescription>Status, papeis e cadastros da plataforma.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Criado em</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{user.email}</TableCell>
+                <TableCell><Badge>{user.role}</Badge></TableCell>
+                <TableCell>{user.status}</TableCell>
+                <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -455,6 +530,48 @@ function MetricCard({ title, value }: { title: string; value: number }) {
         <CardTitle className="text-3xl">{value.toLocaleString()}</CardTitle>
       </CardHeader>
     </Card>
+  );
+}
+
+function StatusPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
+  const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
+
+  useEffect(() => {
+    fetch("https://api.prawurl.com/health")
+      .then((response) => setStatus(response.ok ? "online" : "offline"))
+      .catch(() => setStatus("offline"));
+  }, []);
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-background px-6">
+      <div className="absolute right-6 top-6">
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
+      <Card className="w-full max-w-xl">
+        <CardHeader>
+          <Badge className={status === "online" ? "w-fit border-primary/20 bg-primary/10 text-primary" : "w-fit"}>
+            {status === "checking" ? "Verificando" : status === "online" ? "API operacional" : "API indisponivel"}
+          </Badge>
+          <CardTitle className="pt-4">Status do PrawURL</CardTitle>
+          <CardDescription>
+            Esta pagina consulta o health check da API e mostra um estado legivel para operacao.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-3">
+          <Button onClick={() => window.location.reload()}>Atualizar</Button>
+          <Button variant="outline" onClick={() => (window.location.href = "/")}>Voltar</Button>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void; collapsed?: boolean }) {
+  return (
+    <Button variant="outline" size="icon" onClick={onToggle} aria-label="Alternar tema">
+      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <span className="sr-only">Alternar tema</span>
+    </Button>
   );
 }
 

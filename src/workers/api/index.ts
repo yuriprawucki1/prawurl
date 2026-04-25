@@ -81,7 +81,10 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   const services = makeServices(env);
 
   if (path === "health") {
-    return json({ ok: true, service: "prawurl-api" });
+    if (request.headers.get("accept")?.includes("text/html")) {
+      return new Response(statusHtml(), { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    return json({ ok: true, service: "prawurl-api", checkedAt: new Date().toISOString() });
   }
 
   if (path === "auth/session") {
@@ -326,8 +329,35 @@ function withCors(response: Response, env: Env): Response {
   headers.set("access-control-allow-origin", env.APP_ORIGIN);
   headers.set("access-control-allow-credentials", "true");
   headers.set("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
-  headers.set("access-control-allow-headers", "content-type");
+  headers.set("access-control-allow-headers", "content-type,x-turnstile-token");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function statusHtml(): string {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Status da API - PrawURL</title>
+  <style>
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:#0f172a;color:#f8fafc;display:grid;min-height:100vh;place-items:center}
+    main{width:min(560px,calc(100vw - 32px));border:1px solid #334155;border-radius:12px;padding:32px;background:#111827}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid #0f766e;background:#0f766e22;color:#5eead4;border-radius:999px;padding:6px 12px;font-size:14px}
+    h1{font-size:32px;margin:20px 0 8px}
+    p{color:#cbd5e1;line-height:1.6}
+    a{color:#5eead4}
+  </style>
+</head>
+<body>
+  <main>
+    <span class="pill">● API operacional</span>
+    <h1>PrawURL API</h1>
+    <p>O endpoint de saúde respondeu normalmente em ${new Date().toISOString()}.</p>
+    <p><a href="https://prawurl.com">Voltar para prawurl.com</a></p>
+  </main>
+</body>
+</html>`;
 }
 
 function cookieValue(request: Request, name: string): string | null {
