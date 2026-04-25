@@ -56,6 +56,24 @@ OAuth callback URLs:
 
 ## Deploy
 
+Production deploys run through GitHub Actions on every push to `main`.
+
+Required GitHub Actions secrets:
+
+```text
+CLOUDFLARE_API_TOKEN
+SESSION_SECRET
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET
+TURNSTILE_SECRET_KEY
+VITE_TURNSTILE_SITE_KEY
+LOG_HASH_SALT
+```
+
+The workflow validates TypeScript, runs tests, builds the frontend, applies D1 migrations, deploys both Workers, updates Worker secrets, and deploys Pages.
+
 ```bash
 npm run build
 npx wrangler d1 migrations apply prawurl --remote

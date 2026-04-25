@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "prawurl-web",
+  "account_id": "d723634128052b662d1eb6b6fa16054f",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-04-25",
   "compatibility_flags": ["nodejs_compat"]

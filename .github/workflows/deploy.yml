@@ -1,0 +1,72 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: prawurl-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Validar e publicar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar tipos
+        run: npm run lint
+
+      - name: Rodar testes
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Aplicar migrações D1
+        run: npx wrangler d1 migrations apply prawurl --remote --config wrangler.api.jsonc
+
+      - name: Publicar API Worker
+        run: npx wrangler deploy --config wrangler.api.jsonc
+
+      - name: Publicar Redirect Worker
+        run: npx wrangler deploy --config wrangler.redirect.jsonc
+
+      - name: Atualizar secrets do API Worker
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+        run: |
+          node -e "const fs=require('fs'); const names=['SESSION_SECRET','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GITHUB_CLIENT_ID','GITHUB_CLIENT_SECRET','TURNSTILE_SECRET_KEY']; fs.writeFileSync('/tmp/prawurl-api-secrets.json', JSON.stringify(Object.fromEntries(names.map((name)=>[name, process.env[name] || '']))));"
+          npx wrangler secret bulk /tmp/prawurl-api-secrets.json --config wrangler.api.jsonc
+
+      - name: Atualizar secrets do Redirect Worker
+        env:
+          LOG_HASH_SALT: ${{ secrets.LOG_HASH_SALT }}
+        run: |
+          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-secrets.json', JSON.stringify({ LOG_HASH_SALT: process.env.LOG_HASH_SALT || '' }));"
+          npx wrangler secret bulk /tmp/prawurl-redirect-secrets.json --config wrangler.redirect.jsonc
+
+      - name: Publicar Pages
+        run: npx wrangler pages deploy dist --project-name prawurl-web
