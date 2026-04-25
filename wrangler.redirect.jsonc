@@ -9,6 +9,12 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  "routes": [
+    {
+      "pattern": "prawurl.com/*",
+      "zone_name": "prawurl.com"
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

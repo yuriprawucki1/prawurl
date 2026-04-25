@@ -74,13 +74,6 @@ LOG_HASH_SALT
 
 The workflow validates TypeScript, runs tests, builds the frontend, applies D1 migrations, deploys both Workers, updates Worker secrets, and deploys Pages.
 
-Worker routes are managed outside Wrangler deploy because the GitHub Actions token is intentionally account-scoped:
-
-```text
-api.prawurl.com/* -> prawurl-api
-prawurl.com/* -> prawurl-redirect
-```
-
 ```bash
 npm run build
 npx wrangler d1 migrations apply prawurl --remote
