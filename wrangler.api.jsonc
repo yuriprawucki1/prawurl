@@ -9,12 +9,6 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
-  "routes": [
-    {
-      "pattern": "api.prawurl.com/*",
-      "zone_name": "prawurl.com"
-    }
-  ],
   "vars": {
     "APP_ORIGIN": "https://app.prawurl.com",
     "PUBLIC_ORIGIN": "https://prawurl.com",
