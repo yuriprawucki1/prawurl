@@ -1,18 +1,44 @@
 import { z } from "zod";
 
+export function normalizeDestinationUrlInput(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error("A URL de destino é obrigatória.");
+  }
+
+  const candidates = trimmed.startsWith("http://") || trimmed.startsWith("https://") ? [trimmed] : [`https://${trimmed}`, `http://${trimmed}`];
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return parsed.toString();
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  throw new Error("Use uma URL válida ou informe apenas o domínio.");
+}
+
 export const aliasSchema = z
   .string()
   .min(2, "O alias precisa ter pelo menos 2 caracteres.")
   .max(48)
   .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, "Use letras, números, hífens ou underscores.");
 
-export const destinationUrlSchema = z
-  .string()
-  .url()
-  .refine((value) => {
-    const protocol = new URL(value).protocol;
-    return protocol === "https:" || protocol === "http:";
-  }, "Apenas URLs http e https são suportadas.");
+export const destinationUrlSchema = z.string().trim().transform((value, ctx) => {
+  try {
+    return normalizeDestinationUrlInput(value);
+  } catch (error) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: error instanceof Error ? error.message : "Use uma URL válida ou informe apenas o domínio."
+    });
+    return z.NEVER;
+  }
+});
 
 export const countryCodeSchema = z
   .string()

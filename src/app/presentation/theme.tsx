@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import type { ButtonHTMLAttributes } from "react";
 import { Button } from "../components/ui/button";
@@ -28,8 +28,12 @@ export function useTheme(publicOrigin: string) {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+  }, [theme]);
+
+  useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
     writeThemeCookie(theme, publicOrigin);
   }, [publicOrigin, theme]);

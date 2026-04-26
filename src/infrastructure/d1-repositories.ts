@@ -524,7 +524,7 @@ export class D1MetricsRepository implements MetricsRepository {
       count(this.db, "SELECT COUNT(*) AS value FROM users"),
       count(this.db, "SELECT COUNT(*) AS value FROM users WHERE status = 'active'"),
       count(this.db, "SELECT COUNT(*) AS value FROM links"),
-      count(this.db, "SELECT COUNT(*) AS value FROM links WHERE status = 'active'"),
+      count(this.db, "SELECT COUNT(*) AS value FROM links WHERE status = 'active' AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)"),
       count(this.db, "SELECT COUNT(*) AS value FROM click_events"),
       count(this.db, "SELECT COUNT(*) AS value FROM audit_logs")
     ]);
@@ -665,8 +665,10 @@ function mapAccessLink(row: LinkRow): LinkAccessRecord {
 }
 
 function mapLinkSummary(row: LinkSummaryRow): LinkSummary {
+  const status = row.status === "active" && row.expires_at !== null && Date.parse(row.expires_at) <= Date.now() ? "blocked" : row.status;
   return {
     ...mapLink(row),
+    status,
     clickCount: row.click_count,
     ownerEmail: row.owner_email ?? undefined
   };

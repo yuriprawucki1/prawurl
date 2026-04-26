@@ -10,13 +10,14 @@ import {
   Pin,
   PinOff,
   PencilLine,
+  QrCode,
   Plus,
-  Search,
   Shield,
   Tags,
   Trash2,
   Star,
   StarOff,
+  Loader2,
   Upload,
   Users
 } from "lucide-react";
@@ -36,9 +37,11 @@ import type {
 import { api } from "../lib/api";
 import { resolveOrigins } from "../lib/origins";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { normalizeDestinationUrlInput } from "../../shared/validation";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -47,6 +50,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
+import { Skeleton } from "../components/ui/skeleton";
 
 type AdminTab = "users" | "links" | "blocklist";
 type EditorMode = "create" | "edit";
@@ -72,9 +76,10 @@ export function LinksView() {
 
 export function AnalyticsView() {
   const [links, setLinks] = useState<LinkSummary[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.links().then(({ links }) => setLinks(links));
+    api.links().then(({ links }) => setLinks(links)).finally(() => setLoading(false));
   }, []);
 
   const totalClicks = useMemo(() => links.reduce((sum, link) => sum + link.clickCount, 0), [links]);
@@ -84,19 +89,28 @@ export function AnalyticsView() {
   return (
     <section className="grid gap-6">
       <PageTitle title="Analytics" description="Um panorama rápido dos seus links e sinais de proteção." />
-      <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard title="Links" value={links.length} />
-        <MetricCard title="Cliques" value={totalClicks} />
-        <MetricCard title="Protegidos" value={protectedLinks} />
-        <MetricCard title="Fixados" value={pinnedLinks} />
-      </div>
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricCard title="Links" value={links.length} />
+          <MetricCard title="Cliques" value={totalClicks} />
+          <MetricCard title="Protegidos" value={protectedLinks} />
+          <MetricCard title="Fixados" value={pinnedLinks} />
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Top links</CardTitle>
           <CardDescription>Os links mais usados aparecem primeiro.</CardDescription>
         </CardHeader>
         <CardContent>
-          <LinksList links={links.slice(0, 8)} showOwner={false} />
+          {loading ? <LinksTableSkeleton showOwner={false} hasActions={false} /> : <LinksList links={links.slice(0, 8)} showOwner={false} />}
         </CardContent>
       </Card>
     </section>
@@ -127,12 +141,19 @@ export function AdminView() {
   return (
     <section className="grid gap-6">
       <PageTitle title="Admin" description="Operação da plataforma, governança e blocklist interna." />
-      {summary && (
+      {summary ? (
         <div className="grid gap-4 md:grid-cols-4">
           <MetricCard title="Usuários" value={summary.users} />
           <MetricCard title="Links" value={summary.links} />
           <MetricCard title="Cliques" value={summary.clicks} />
           <MetricCard title="Auditoria" value={summary.auditEvents} />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
         </div>
       )}
       <Tabs>
@@ -165,16 +186,17 @@ export function AdminView() {
           showOwner
         />
       )}
-      {tab === "users" && <UsersTable users={users} />}
-      {tab === "blocklist" && <BlocklistPanel blockedDomains={blockedDomains} onRefresh={refresh} />}
+      {tab === "users" && <UsersTable users={users} loading={!summary} />}
+      {tab === "blocklist" && <BlocklistPanel blockedDomains={blockedDomains} onRefresh={refresh} loading={!summary} />}
     </section>
   );
 }
 
 export function AuditLogsView() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    api.adminAuditLogs().then(({ logs }) => setLogs(logs));
+    api.adminAuditLogs().then(({ logs }) => setLogs(logs)).finally(() => setLoading(false));
   }, []);
 
   return (
@@ -186,58 +208,7 @@ export function AuditLogsView() {
           <CardDescription>Use esta visão para entender quem fez o quê, quando e em qual entidade.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid gap-3 md:hidden">
-            {logs.map((log) => (
-              <div key={log.id} className="grid gap-2 rounded-md border p-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{log.action}</span>
-                  <Badge>{severityLabel(log.severity)}</Badge>
-                </div>
-                <div className="grid gap-1 text-xs text-muted-foreground">
-                  <span>
-                    Entidade: {log.entityType}
-                    {log.entityId ? `/${shortId(log.entityId)}` : ""}
-                  </span>
-                  <span>Ator: {log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</span>
-                </div>
-                <AuditMetadata metadata={log.metadata} />
-                <div className="text-xs text-muted-foreground">{new Date(log.occurredAt).toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Quando</TableHead>
-                  <TableHead>Ação</TableHead>
-                  <TableHead>Ator</TableHead>
-                  <TableHead>Entidade</TableHead>
-                  <TableHead>Dados</TableHead>
-                  <TableHead>Severidade</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>{new Date(log.occurredAt).toLocaleString()}</TableCell>
-                    <TableCell>{log.action}</TableCell>
-                    <TableCell>{log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</TableCell>
-                    <TableCell>
-                      {log.entityType}
-                      {log.entityId ? `/${shortId(log.entityId)}` : ""}
-                    </TableCell>
-                    <TableCell className="max-w-sm">
-                      <AuditMetadata metadata={log.metadata} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge>{severityLabel(log.severity)}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          {loading ? <AuditLogsSkeleton /> : <AuditLogsList logs={logs} />}
         </CardContent>
       </Card>
     </section>
@@ -272,6 +243,8 @@ function LinkWorkspace({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<LinkSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LinkSummary | null>(null);
+  const [qrTarget, setQrTarget] = useState<LinkSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -328,15 +301,6 @@ function LinkWorkspace({
     }
   }
 
-  async function removeLink(id: string) {
-    if (!window.confirm("Excluir este link?")) {
-      return;
-    }
-    await deleteLink(id);
-    setSelectedIds((current) => current.filter((selected) => selected !== id));
-    refresh();
-  }
-
   async function toggleStatus(ids: string[], action: "activate" | "deactivate") {
     await bulkAction({ ids, action });
     setSelectedIds([]);
@@ -364,10 +328,8 @@ function LinkWorkspace({
     refresh();
   }
 
-  const selectedLinks = useMemo(() => links.filter((link) => selectedIds.includes(link.id)), [links, selectedIds]);
-
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6" aria-busy={refreshing}>
       <PageTitle title={title} description={description} />
 
       <Card>
@@ -419,26 +381,24 @@ function LinkWorkspace({
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           {loading && links.length === 0 ? (
-            <div className="rounded-md border p-6 text-sm text-muted-foreground">Carregando links...</div>
+            <LinksTableSkeleton showOwner={showOwner} hasActions={true} />
           ) : (
-            <div className="grid gap-3">
-              {refreshing && <div className="text-xs text-muted-foreground">Atualizando links sem interromper a visualização.</div>}
-              <LinksList
-                links={links}
-                showOwner={showOwner}
-                selectedIds={selectedIds}
-                onToggleSelected={(id) =>
-                  setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
-                }
-                onEdit={(link) => {
-                  setEditingLink(link);
-                  setEditorOpen(true);
-                }}
-                onDelete={removeLink}
-                onToggleFavorite={toggleFavorite}
-                onTogglePinned={togglePinned}
-              />
-            </div>
+            <LinksList
+              links={links}
+              showOwner={showOwner}
+              selectedIds={selectedIds}
+              onToggleSelected={(id) =>
+                setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
+              }
+              onEdit={(link) => {
+                setEditingLink(link);
+                setEditorOpen(true);
+              }}
+              onRequestDelete={(link) => setDeleteTarget(link)}
+              onRequestQr={(link) => setQrTarget(link)}
+              onToggleFavorite={toggleFavorite}
+              onTogglePinned={togglePinned}
+            />
           )}
         </CardContent>
       </Card>
@@ -456,6 +416,27 @@ function LinkWorkspace({
         onSubmit={submitLink}
         busy={saving}
       />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        link={deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+        onConfirm={async () => {
+          if (!deleteTarget) {
+            return;
+          }
+          await deleteLink(deleteTarget.id);
+          setSelectedIds((current) => current.filter((selected) => selected !== deleteTarget.id));
+          setDeleteTarget(null);
+          refresh();
+        }}
+      />
+
+      <QrCodeDialog open={Boolean(qrTarget)} link={qrTarget} onOpenChange={(open) => !open && setQrTarget(null)} />
     </section>
   );
 }
@@ -578,23 +559,37 @@ function LinkEditorDialog({
 }) {
   const isMobile = useIsMobile();
   const [form, setForm] = useState<LinkFormState>(() => stateFromLink(null));
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setForm(stateFromLink(initialLink));
+      setFormError(null);
     }
   }, [initialLink, open]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await onSubmit(formToInput(form, mode));
+    try {
+      setFormError(null);
+      await onSubmit(formToInput(form, mode));
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Não foi possível salvar o link.");
+    }
   }
 
   const content = (
     <form className="grid gap-4 p-4" onSubmit={submit}>
       <div className="grid gap-2">
         <Label>URL destino</Label>
-        <Input value={form.destinationUrl} onChange={(event) => setForm((current) => ({ ...current, destinationUrl: event.target.value }))} placeholder="https://..." />
+        <Input
+          value={form.destinationUrl}
+          onChange={(event) => setForm((current) => ({ ...current, destinationUrl: event.target.value }))}
+          placeholder="https://..."
+          autoCapitalize="none"
+          autoCorrect="off"
+          inputMode="url"
+        />
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         <div className="grid gap-2">
@@ -673,13 +668,35 @@ function LinkEditorDialog({
       <div className="grid gap-2 md:grid-cols-2">
         <div className="grid gap-2">
           <Label>Países permitidos</Label>
-          <Input value={form.countryAllowlist} onChange={(event) => setForm((current) => ({ ...current, countryAllowlist: event.target.value }))} placeholder="BR, US" />
+          <Input
+            list="country-code-options"
+            value={form.countryAllowlist}
+            onChange={(event) => setForm((current) => ({ ...current, countryAllowlist: event.target.value }))}
+            placeholder="BR, US"
+            autoCapitalize="characters"
+            autoCorrect="off"
+          />
         </div>
         <div className="grid gap-2">
           <Label>Países bloqueados</Label>
-          <Input value={form.countryBlocklist} onChange={(event) => setForm((current) => ({ ...current, countryBlocklist: event.target.value }))} placeholder="RU, CN" />
+          <Input
+            list="country-code-options"
+            value={form.countryBlocklist}
+            onChange={(event) => setForm((current) => ({ ...current, countryBlocklist: event.target.value }))}
+            placeholder="RU, CN"
+            autoCapitalize="characters"
+            autoCorrect="off"
+          />
         </div>
       </div>
+      <datalist id="country-code-options">
+        {COUNTRY_SUGGESTIONS.map((country) => (
+          <option key={country.code} value={country.code}>
+            {country.label}
+          </option>
+        ))}
+      </datalist>
+      <p className="text-xs text-muted-foreground">Digite um ou mais códigos ISO, separados por vírgula. O campo sugere os códigos mais usados.</p>
       <div className="flex flex-wrap gap-4">
         <label className="flex items-center gap-2 text-sm">
           <input checked={form.favorite} onChange={(event) => setForm((current) => ({ ...current, favorite: event.target.checked }))} type="checkbox" />
@@ -698,6 +715,7 @@ function LinkEditorDialog({
           Cancelar
         </Button>
       </div>
+      {formError && <p className="text-sm text-destructive">{formError}</p>}
     </form>
   );
 
@@ -734,7 +752,8 @@ function LinksList({
   selectedIds = [],
   onToggleSelected,
   onEdit,
-  onDelete,
+  onRequestDelete,
+  onRequestQr,
   onToggleFavorite,
   onTogglePinned
 }: {
@@ -743,11 +762,12 @@ function LinksList({
   selectedIds?: string[];
   onToggleSelected?: (id: string) => void;
   onEdit?: (link: LinkSummary) => void;
-  onDelete?: (id: string) => void;
+  onRequestDelete?: (link: LinkSummary) => void;
+  onRequestQr?: (link: LinkSummary) => void;
   onToggleFavorite?: (link: LinkSummary) => void;
   onTogglePinned?: (link: LinkSummary) => void;
 }) {
-  const hasActions = Boolean(onEdit || onDelete || onToggleFavorite || onTogglePinned);
+  const hasActions = Boolean(onEdit || onRequestDelete || onRequestQr || onToggleFavorite || onTogglePinned);
 
   return (
     <div className="grid gap-3">
@@ -767,6 +787,7 @@ function LinksList({
               <div className="flex items-center gap-1">
                 <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
                 {onEdit && <MiniActionButton icon={<PencilLine className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
+                {onRequestQr && <MiniActionButton icon={<QrCode className="h-4 w-4" />} label="QR Code" onClick={() => onRequestQr(link)} />}
               </div>
             </div>
             <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
@@ -801,8 +822,8 @@ function LinksList({
                   {link.pinned ? "Desafixar" : "Fixar"}
                 </Button>
               )}
-              {onDelete && (
-                <Button size="sm" variant="destructive" onClick={() => onDelete(link.id)}>
+              {onRequestDelete && (
+                <Button size="sm" variant="destructive" onClick={() => onRequestDelete(link)}>
                   Excluir
                 </Button>
               )}
@@ -813,17 +834,17 @@ function LinksList({
 
       <div className="hidden md:block">
         <div className="overflow-x-auto rounded-md border">
-          <Table className="w-full table-fixed">
+          <Table className="min-w-[1280px] table-fixed">
             <TableHeader>
               <TableRow>
                 {onToggleSelected && <TableHead className="w-10" />}
                 <TableHead className="w-[18rem]">Curto</TableHead>
-                <TableHead>Destino</TableHead>
-                {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
+                <TableHead className="w-[24rem]">Destino</TableHead>
+                {showOwner && <TableHead className="w-[16rem]">Dono</TableHead>}
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead className="w-24">Cliques</TableHead>
                 <TableHead className="w-[14rem]">Sinais</TableHead>
-                {hasActions && <TableHead className="w-40">Ações</TableHead>}
+                {hasActions && <TableHead className="w-[14rem]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -867,8 +888,8 @@ function LinksList({
                     </div>
                   </TableCell>
                   {hasActions && (
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1">
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex flex-nowrap items-center justify-end gap-0">
                         {onEdit && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -899,10 +920,20 @@ function LinksList({
                             <TooltipContent>{link.pinned ? "Desafixar" : "Fixar"}</TooltipContent>
                           </Tooltip>
                         )}
-                        {onDelete && (
+                        {onRequestQr && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon-sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(link.id)} aria-label="Excluir link">
+                              <Button size="icon-sm" variant="ghost" onClick={() => onRequestQr(link)} aria-label="Ver QR code">
+                                <QrCode className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>QR Code</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {onRequestDelete && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon-sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onRequestDelete(link)} aria-label="Excluir link">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
@@ -924,10 +955,12 @@ function LinksList({
 
 function BlocklistPanel({
   blockedDomains,
-  onRefresh
+  onRefresh,
+  loading
 }: {
   blockedDomains: BlockedDomainEntry[];
   onRefresh: () => void;
+  loading: boolean;
 }) {
   const [domain, setDomain] = useState("");
   const [reason, setReason] = useState("");
@@ -968,25 +1001,13 @@ function BlocklistPanel({
           <Button type="submit">Adicionar</Button>
         </form>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="grid gap-3">
-          {blockedDomains.map((entry) => (
-            <div key={entry.domain} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-              <div>
-                <div className="font-medium">{entry.domain}</div>
-                <div className="text-sm text-muted-foreground">{entry.reason}</div>
-              </div>
-              <Button size="sm" variant="destructive" onClick={() => remove(entry.domain)}>
-                Remover
-              </Button>
-            </div>
-          ))}
-        </div>
+        {loading ? <BlocklistSkeleton /> : <div className="grid gap-3">{blockedDomains.map((entry) => <BlocklistRow key={entry.domain} entry={entry} onRemove={() => remove(entry.domain)} />)}</div>}
       </CardContent>
     </Card>
   );
 }
 
-function UsersTable({ users }: { users: User[] }) {
+function UsersTable({ users, loading }: { users: User[]; loading: boolean }) {
   return (
     <Card>
       <CardHeader>
@@ -994,46 +1015,445 @@ function UsersTable({ users }: { users: User[] }) {
         <CardDescription>Status, papéis e cadastros da plataforma.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 md:hidden">
-          {users.map((user) => (
-            <div key={user.id} className="grid gap-2 rounded-md border p-3 text-sm">
-              <div className="font-medium">{user.email}</div>
-              <div className="flex flex-wrap gap-2">
-                <Badge>{roleLabel(user.role)}</Badge>
-                <Badge>{userStatusLabel(user.status)}</Badge>
-              </div>
-              <div className="text-xs text-muted-foreground">{new Date(user.createdAt).toLocaleString()}</div>
-            </div>
-          ))}
-        </div>
-        <div className="hidden md:block">
-          <Table className="min-w-[760px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge>{roleLabel(user.role)}</Badge>
-                  </TableCell>
-                  <TableCell>{userStatusLabel(user.status)}</TableCell>
-                  <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        {loading ? <UsersTableSkeleton /> : <UsersTableContent users={users} />}
       </CardContent>
     </Card>
   );
 }
+
+function UsersTableContent({ users }: { users: User[] }) {
+  return (
+    <>
+      <div className="grid gap-3 md:hidden">
+        {users.map((user) => (
+          <div key={user.id} className="grid gap-2 rounded-md border p-3 text-sm">
+            <div className="font-medium">{user.email}</div>
+            <div className="flex flex-wrap gap-2">
+              <Badge>{roleLabel(user.role)}</Badge>
+              <Badge>{userStatusLabel(user.status)}</Badge>
+            </div>
+            <div className="text-xs text-muted-foreground">{new Date(user.createdAt).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <Table className="min-w-[760px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Criado em</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <Badge>{roleLabel(user.role)}</Badge>
+                </TableCell>
+                <TableCell>{userStatusLabel(user.status)}</TableCell>
+                <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
+}
+
+function AuditLogsList({ logs }: { logs: AuditLog[] }) {
+  return (
+    <>
+      <div className="grid gap-3 md:hidden">
+        {logs.map((log) => (
+          <div key={log.id} className="grid gap-2 rounded-md border p-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">{log.action}</span>
+              <Badge>{severityLabel(log.severity)}</Badge>
+            </div>
+            <div className="grid gap-1 text-xs text-muted-foreground">
+              <span>
+                Entidade: {log.entityType}
+                {log.entityId ? `/${shortId(log.entityId)}` : ""}
+              </span>
+              <span>Ator: {log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</span>
+            </div>
+            <AuditMetadata metadata={log.metadata} />
+            <div className="text-xs text-muted-foreground">{new Date(log.occurredAt).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Quando</TableHead>
+              <TableHead>Ação</TableHead>
+              <TableHead>Ator</TableHead>
+              <TableHead>Entidade</TableHead>
+              <TableHead>Dados</TableHead>
+              <TableHead>Severidade</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {logs.map((log) => (
+              <TableRow key={log.id}>
+                <TableCell>{new Date(log.occurredAt).toLocaleString()}</TableCell>
+                <TableCell>{log.action}</TableCell>
+                <TableCell>{log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</TableCell>
+                <TableCell>
+                  {log.entityType}
+                  {log.entityId ? `/${shortId(log.entityId)}` : ""}
+                </TableCell>
+                <TableCell className="max-w-sm">
+                  <AuditMetadata metadata={log.metadata} />
+                </TableCell>
+                <TableCell>
+                  <Badge>{severityLabel(log.severity)}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
+}
+
+function ConfirmDeleteDialog({
+  open,
+  link,
+  onOpenChange,
+  onConfirm
+}: {
+  open: boolean;
+  link: LinkSummary | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => Promise<void>;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir link?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {link ? (
+              <>
+                Essa ação remove <span className="font-medium text-foreground">{link.alias}</span> permanentemente.
+              </>
+            ) : (
+              "Essa ação remove o link permanentemente."
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+          </AlertDialogCancel>
+          <AlertDialogAction>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await onConfirm();
+              }}
+            >
+              Excluir
+            </Button>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function QrCodeDialog({
+  open,
+  link,
+  onOpenChange
+}: {
+  open: boolean;
+  link: LinkSummary | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!open || !link) {
+      setQrDataUrl(null);
+      return;
+    }
+
+    QRCode.toDataURL(`${publicOrigin}/${link.alias}`, { width: 320, margin: 1 })
+      .then((value) => {
+        if (active) {
+          setQrDataUrl(value);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setQrDataUrl(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [link, open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>QR Code</DialogTitle>
+          <DialogDescription>{link ? `${publicOrigin}/${link.alias}` : "Compartilhe este link por QR Code."}</DialogDescription>
+        </DialogHeader>
+        <div className="grid place-items-center gap-4">
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt={`QR Code de ${link?.alias ?? "link"}`} className="h-56 w-56 rounded-lg border bg-white p-3" />
+          ) : (
+            <div className="grid h-56 w-56 place-items-center rounded-lg border bg-muted">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (link) {
+                await navigator.clipboard.writeText(`${publicOrigin}/${link.alias}`);
+              }
+            }}
+          >
+            Copiar URL
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; hasActions: boolean }) {
+  return (
+    <div className="grid gap-3 rounded-md border p-3">
+      <div className="grid gap-3 md:hidden">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="grid gap-3 rounded-md border p-3">
+            <div className="flex items-start justify-between gap-3">
+              <Skeleton className="h-4 w-4 rounded-sm" />
+              <div className="grid flex-1 gap-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-full" />
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-14" />
+              <Skeleton className="h-5 w-16" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-20" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+          <Table className="min-w-[1280px] table-fixed">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">
+                  <Skeleton className="h-4 w-4" />
+                </TableHead>
+              <TableHead className="w-[18rem]">Curto</TableHead>
+              <TableHead className="w-[24rem]">Destino</TableHead>
+              {showOwner && <TableHead className="w-[16rem]">Dono</TableHead>}
+              <TableHead className="w-28">Status</TableHead>
+              <TableHead className="w-24">Cliques</TableHead>
+              <TableHead className="w-[14rem]">Sinais</TableHead>
+              {hasActions && <TableHead className="w-[14rem]">Ações</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[0, 1, 2].map((index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Skeleton className="h-4 w-4" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="mt-2 h-3 w-20" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-56" />
+                </TableCell>
+                {showOwner && (
+                  <TableCell>
+                    <Skeleton className="h-4 w-32" />
+                  </TableCell>
+                )}
+                <TableCell>
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-8" />
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </TableCell>
+                {hasActions && (
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function MetricCardSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-9 w-24" />
+      </CardHeader>
+    </Card>
+  );
+}
+
+function AuditLogsSkeleton() {
+  return (
+    <div className="grid gap-3">
+      {[0, 1, 2, 3].map((index) => (
+        <div key={index} className="grid gap-2 rounded-md border p-3">
+          <Skeleton className="h-4 w-40" />
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BlocklistSkeleton() {
+  return (
+    <div className="grid gap-3">
+      {[0, 1, 2].map((index) => (
+        <div key={index} className="flex items-center justify-between gap-3 rounded-md border p-3">
+          <div className="grid gap-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+          <Skeleton className="h-9 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BlocklistRow({ entry, onRemove }: { entry: BlockedDomainEntry; onRemove: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+      <div>
+        <div className="font-medium">{entry.domain}</div>
+        <div className="text-sm text-muted-foreground">{entry.reason}</div>
+      </div>
+      <Button size="sm" variant="destructive" onClick={onRemove}>
+        Remover
+      </Button>
+    </div>
+  );
+}
+
+function UsersTableSkeleton() {
+  return (
+    <div className="grid gap-3">
+      <div className="grid gap-3 md:hidden">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="grid gap-2 rounded-md border p-3">
+            <Skeleton className="h-4 w-48" />
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-32" />
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <Table className="min-w-[760px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Criado em</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[0, 1, 2].map((index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Skeleton className="h-4 w-48" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-28" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+const COUNTRY_SUGGESTIONS = [
+  { code: "BR", label: "Brasil" },
+  { code: "US", label: "Estados Unidos" },
+  { code: "PT", label: "Portugal" },
+  { code: "ES", label: "Espanha" },
+  { code: "AR", label: "Argentina" },
+  { code: "CL", label: "Chile" },
+  { code: "CO", label: "Colômbia" },
+  { code: "MX", label: "México" },
+  { code: "PE", label: "Peru" },
+  { code: "UY", label: "Uruguai" },
+  { code: "GB", label: "Reino Unido" },
+  { code: "DE", label: "Alemanha" },
+  { code: "FR", label: "França" },
+  { code: "IT", label: "Itália" },
+  { code: "JP", label: "Japão" },
+  { code: "CA", label: "Canadá" }
+];
 
 function PageTitle({ title, description }: { title: string; description: string }) {
   return (
@@ -1163,16 +1583,6 @@ function parseStatus(value: string): LinkStatus | undefined {
   return undefined;
 }
 
-function parseBooleanFilter(value: string): boolean | undefined {
-  if (value === "1") {
-    return true;
-  }
-  if (value === "0") {
-    return false;
-  }
-  return undefined;
-}
-
 function stateFromLink(link: LinkSummary | null): LinkFormState {
   if (!link) {
     return {
@@ -1215,7 +1625,7 @@ function stateFromLink(link: LinkSummary | null): LinkFormState {
 
 function formToInput(form: LinkFormState, mode: EditorMode): LinkFormInput {
   return {
-    destinationUrl: form.destinationUrl.trim(),
+    destinationUrl: normalizeDestinationUrlInput(form.destinationUrl),
     alias: form.alias.trim() || undefined,
     title: form.title.trim() || undefined,
     tags: parseDelimited(form.tags),
