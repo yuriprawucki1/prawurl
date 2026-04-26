@@ -7,6 +7,7 @@ import { getCookieDomain } from "../lib/origins";
 export type Theme = "light" | "dark";
 
 const themeCookieName = "prawurl_theme";
+const themeHostCookieName = "prawurl_theme_host";
 const themeStorageKey = "prawurl-theme";
 
 export function useTheme(publicOrigin: string) {
@@ -15,7 +16,7 @@ export function useTheme(publicOrigin: string) {
       return "light";
     }
 
-    const cookieTheme = readCookie(themeCookieName);
+    const cookieTheme = readCookie(themeHostCookieName) ?? readCookie(themeCookieName);
     if (cookieTheme === "light" || cookieTheme === "dark") {
       return cookieTheme;
     }
@@ -79,5 +80,6 @@ function readCookie(name: string): string | null {
 
 function writeThemeCookie(theme: Theme, publicOrigin: string): void {
   const domain = getCookieDomain(publicOrigin);
+  document.cookie = `${themeHostCookieName}=${theme}; path=/; max-age=31536000; SameSite=Lax`;
   document.cookie = `${themeCookieName}=${theme}; path=/; max-age=31536000; SameSite=Lax${domain}`;
 }

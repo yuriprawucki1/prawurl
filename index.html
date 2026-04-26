@@ -10,8 +10,9 @@
       (() => {
         try {
           const key = "prawurl-theme";
-          const cookie = document.cookie.split("; ").find((item) => item.startsWith("prawurl_theme="));
-          let theme = cookie ? cookie.split("=")[1] : window.localStorage.getItem(key);
+          const hostCookie = document.cookie.split("; ").find((item) => item.startsWith("prawurl_theme_host="));
+          const domainCookie = document.cookie.split("; ").find((item) => item.startsWith("prawurl_theme="));
+          let theme = hostCookie ? hostCookie.split("=")[1] : domainCookie ? domainCookie.split("=")[1] : window.localStorage.getItem(key);
           if (theme !== "light" && theme !== "dark") {
             theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
           }

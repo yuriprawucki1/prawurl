@@ -10,6 +10,7 @@ import {
   Pin,
   PinOff,
   PencilLine,
+  MoreVertical,
   QrCode,
   Plus,
   Shield,
@@ -52,6 +53,7 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
 import { Skeleton } from "../components/ui/skeleton";
 import { useToast } from "../components/ui/toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 
 type AdminTab = "users" | "links" | "blocklist";
 type EditorMode = "create" | "edit";
@@ -204,13 +206,7 @@ export function AuditLogsView() {
     <section className="grid min-w-0 gap-6">
       <PageTitle title="Auditoria" description="Eventos persistentes de autenticação, links, admin e segurança." />
       <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>Eventos recentes</CardTitle>
-          <CardDescription>Use esta visão para entender quem fez o quê, quando e em qual entidade.</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {loading ? <AuditLogsSkeleton /> : <AuditLogsList logs={logs} />}
-        </CardContent>
+        <CardContent className="pt-6">{loading ? <AuditLogsSkeleton /> : <AuditLogsList logs={logs} />}</CardContent>
       </Card>
     </section>
   );
@@ -334,23 +330,19 @@ function LinkWorkspace({
     <section className="grid min-w-0 gap-6" aria-busy={refreshing}>
       <PageTitle title={title} description={description} />
 
-      <Card>
+      <Card className="min-w-0">
         <CardHeader className="gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle>{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </div>
             <Button onClick={() => setEditorOpen(true)}>
               <Plus className="h-4 w-4" />
               Novo link
             </Button>
-          </div>
-          <div className="hidden md:block">
-            <FiltersBar filters={filters} onChange={setFilters} />
-          </div>
-          <div className="md:hidden">
-            <MobileFiltersSheet filters={filters} onChange={setFilters} />
+            <div className="hidden md:block">
+              <FiltersBar filters={filters} onChange={setFilters} />
+            </div>
+            <div className="md:hidden">
+              <MobileFiltersSheet filters={filters} onChange={setFilters} />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="grid min-w-0 gap-4">
@@ -772,67 +764,69 @@ function LinksList({
                   {link.title && <div className="truncate text-xs text-muted-foreground">{link.title}</div>}
                 </div>
               </label>
-              <div className="flex items-center gap-1">
-                <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
-                {onEdit && <MiniActionButton icon={<PencilLine className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
-                {onRequestQr && <MiniActionButton icon={<QrCode className="h-4 w-4" />} label="QR Code" onClick={() => onRequestQr(link)} />}
-              </div>
-            </div>
-            <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Badge>{linkStatusLabel(link.status)}</Badge>
-              <Badge>{link.clickCount} cliques</Badge>
-              {link.passwordProtected && <Badge><Lock className="mr-1 h-3 w-3" />Senha</Badge>}
-              {link.favorite && <Badge>Favorito</Badge>}
-              {link.pinned && <Badge>Fixado</Badge>}
-              {showOwner && <Badge>{link.ownerEmail ?? shortId(link.ownerId)}</Badge>}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {link.tags.length > 0 ? (
-                link.tags.map((tag) => (
-                  <Badge key={tag} className="gap-1">
-                    <Tags className="h-3 w-3" />
-                    {tag}
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-xs text-muted-foreground">Sem tags</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {onToggleFavorite && (
-                <Button size="sm" variant="outline" onClick={() => onToggleFavorite(link)}>
-                  {link.favorite ? "Desfavoritar" : "Favoritar"}
-                </Button>
-              )}
-              {onTogglePinned && (
-                <Button size="sm" variant="outline" onClick={() => onTogglePinned(link)}>
-                  {link.pinned ? "Desafixar" : "Fixar"}
-                </Button>
-              )}
-              {onRequestDelete && (
-                <Button size="sm" variant="destructive" onClick={() => onRequestDelete(link)}>
-                  Excluir
-                </Button>
-              )}
+            <div className="flex items-center gap-1">
+              <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
+              {onEdit && <MiniActionButton icon={<PencilLine className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
+              {onRequestQr && <MiniActionButton icon={<QrCode className="h-4 w-4" />} label="QR Code" onClick={() => onRequestQr(link)} />}
             </div>
           </div>
-        ))}
+          <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge>{linkStatusLabel(link.status)}</Badge>
+            <Badge>{link.clickCount} cliques</Badge>
+            {link.passwordProtected && <Badge><Lock className="mr-1 h-3 w-3" />Senha</Badge>}
+            {link.favorite && <Badge>Favorito</Badge>}
+            {link.pinned && <Badge>Fixado</Badge>}
+            {showOwner && <Badge>{link.ownerEmail ?? shortId(link.ownerId)}</Badge>}
+          </div>
+          <div className="flex max-h-24 flex-col gap-1 overflow-y-auto pr-1">
+            {link.tags.length > 0 ? (
+              link.tags.map((tag) => (
+                <Badge key={tag} className="w-fit gap-1">
+                  <Tags className="h-3 w-3" />
+                  {tag}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground">Sem tags</span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {onToggleFavorite && (
+              <MiniActionButton
+                icon={link.favorite ? <StarOff className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+                label={link.favorite ? "Desfavoritar" : "Favoritar"}
+                onClick={() => onToggleFavorite(link)}
+              />
+            )}
+            {onTogglePinned && (
+              <MiniActionButton
+                icon={link.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                label={link.pinned ? "Desafixar" : "Fixar"}
+                onClick={() => onTogglePinned(link)}
+              />
+            )}
+            {onRequestDelete && (
+              <MiniActionButton icon={<Trash2 className="h-4 w-4" />} label="Excluir" onClick={() => onRequestDelete(link)} variant="destructive" />
+            )}
+          </div>
+        </div>
+      ))}
       </div>
 
       <div className="hidden min-w-0 md:block">
         <div className="overflow-x-auto rounded-md border">
-          <Table className="min-w-[1280px] table-fixed">
+          <Table className="min-w-[960px] table-fixed">
             <TableHeader>
               <TableRow>
                 {onToggleSelected && <TableHead className="w-10" />}
-                <TableHead className="w-[18rem]">Curto</TableHead>
-                <TableHead className="w-[24rem]">Destino</TableHead>
-                {showOwner && <TableHead className="w-[16rem]">Dono</TableHead>}
+                <TableHead className="w-[14rem]">Curto</TableHead>
+                <TableHead className="w-[18rem]">Destino</TableHead>
+                {showOwner && <TableHead className="w-[14rem]">Dono</TableHead>}
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead className="w-24">Cliques</TableHead>
-                <TableHead className="w-[14rem]">Sinais</TableHead>
-                {hasActions && <TableHead className="w-[14rem]">Ações</TableHead>}
+                <TableHead className="w-[12rem]">Sinais</TableHead>
+                {hasActions && <TableHead className="w-16">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -867,7 +861,7 @@ function LinksList({
                   </TableCell>
                   <TableCell>{link.clickCount}</TableCell>
                   <TableCell>
-                    <div className="flex max-w-64 flex-wrap gap-1">
+                    <div className="flex max-h-24 max-w-48 flex-col gap-1 overflow-y-auto pr-1">
                       {link.favorite && <Badge>Favorito</Badge>}
                       {link.pinned && <Badge>Fixado</Badge>}
                       {link.safetyStatus !== "clean" && <Badge>{link.safetyStatus}</Badge>}
@@ -877,57 +871,49 @@ function LinksList({
                   </TableCell>
                   {hasActions && (
                     <TableCell className="whitespace-nowrap">
-                      <div className="flex flex-nowrap items-center justify-end gap-0">
-                        {onEdit && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="icon-sm" variant="ghost" onClick={() => onEdit(link)} aria-label="Editar link">
-                                <PencilLine className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {onToggleFavorite && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="icon-sm" variant="ghost" onClick={() => onToggleFavorite(link)} aria-label={link.favorite ? "Desfavoritar link" : "Favoritar link"}>
-                                {link.favorite ? <StarOff className="h-4 w-4" /> : <Star className="h-4 w-4" />}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>{link.favorite ? "Desfavoritar" : "Favoritar"}</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {onTogglePinned && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="icon-sm" variant="ghost" onClick={() => onTogglePinned(link)} aria-label={link.pinned ? "Desafixar link" : "Fixar link"}>
-                                {link.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>{link.pinned ? "Desafixar" : "Fixar"}</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {onRequestQr && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="icon-sm" variant="ghost" onClick={() => onRequestQr(link)} aria-label="Ver QR code">
-                                <QrCode className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>QR Code</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {onRequestDelete && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="icon-sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onRequestDelete(link)} aria-label="Excluir link">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Excluir</TooltipContent>
-                          </Tooltip>
-                        )}
+                      <div className="flex justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon-sm" variant="ghost" aria-label="Abrir ações do link">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-44">
+                            {onEdit && (
+                              <DropdownMenuItem onClick={() => onEdit(link)}>
+                                <PencilLine className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                            )}
+                            {onToggleFavorite && (
+                              <DropdownMenuItem onClick={() => onToggleFavorite(link)}>
+                                {link.favorite ? <StarOff className="mr-2 h-4 w-4" /> : <Star className="mr-2 h-4 w-4" />}
+                                {link.favorite ? "Desfavoritar" : "Favoritar"}
+                              </DropdownMenuItem>
+                            )}
+                            {onTogglePinned && (
+                              <DropdownMenuItem onClick={() => onTogglePinned(link)}>
+                                {link.pinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                                {link.pinned ? "Desafixar" : "Fixar"}
+                              </DropdownMenuItem>
+                            )}
+                            {onRequestQr && (
+                              <DropdownMenuItem onClick={() => onRequestQr(link)}>
+                                <QrCode className="mr-2 h-4 w-4" />
+                                QR Code
+                              </DropdownMenuItem>
+                            )}
+                            {onRequestDelete && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem variant="destructive" onClick={() => onRequestDelete(link)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   )}
@@ -1253,19 +1239,19 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
         ))}
       </div>
       <div className="hidden min-w-0 md:block">
-          <Table className="min-w-[1280px] table-fixed">
+          <Table className="min-w-[960px] table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
                   <Skeleton className="h-4 w-4" />
                 </TableHead>
-              <TableHead className="w-[18rem]">Curto</TableHead>
-              <TableHead className="w-[24rem]">Destino</TableHead>
-              {showOwner && <TableHead className="w-[16rem]">Dono</TableHead>}
+              <TableHead className="w-[14rem]">Curto</TableHead>
+              <TableHead className="w-[18rem]">Destino</TableHead>
+              {showOwner && <TableHead className="w-[14rem]">Dono</TableHead>}
               <TableHead className="w-28">Status</TableHead>
               <TableHead className="w-24">Cliques</TableHead>
-              <TableHead className="w-[14rem]">Sinais</TableHead>
-              {hasActions && <TableHead className="w-[14rem]">Ações</TableHead>}
+              <TableHead className="w-[12rem]">Sinais</TableHead>
+              {hasActions && <TableHead className="w-16">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1609,14 +1595,16 @@ function CopyLinkButton({ value }: { value: string }) {
 function MiniActionButton({
   icon,
   label,
-  onClick
+  onClick,
+  variant = "ghost"
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
+  variant?: React.ComponentProps<typeof Button>["variant"];
 }) {
   return (
-    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClick} aria-label={label}>
+    <Button variant={variant} size="icon" className="h-8 w-8" onClick={onClick} aria-label={label}>
       {icon}
     </Button>
   );
