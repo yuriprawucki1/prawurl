@@ -22,6 +22,7 @@
 - Os callbacks OAuth de staging seguem o `VITE_API_ORIGIN` do deploy; hoje o valor confiável é o endpoint `workers.dev` enquanto o hostname customizado fica pronto.
 - Se o botão `Run workflow` não aparecer para staging, disparar um novo push na branch `staging`; workflows que ainda não vivem na `main` podem não aparecer na UI de Actions.
 - Domínios custom do Pages podem ficar `pending` mesmo depois do CNAME existir; o `pages.dev` do projeto costuma funcionar enquanto a validação/certificado termina.
+- Domínio custom do Worker pode ficar anexado com sucesso e ainda falhar no TLS por alguns minutos; não trocar o frontend para ele antes de `curl https://.../health` responder 200.
 
 ## Notas do projeto
 
