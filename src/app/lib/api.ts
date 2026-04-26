@@ -33,6 +33,7 @@ export const api = {
       body: JSON.stringify(input)
     }),
   links: () => request<{ links: LinkSummary[] }>("/links"),
+  resolvePublicAlias: (alias: string) => request<{ destinationUrl: string }>(`/public/resolve/${encodeURIComponent(alias)}`),
   logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
   adminSummary: () => request<{ summary: PlatformSummary }>("/admin/summary"),
   adminUsers: () => request<{ users: User[] }>("/admin/users"),

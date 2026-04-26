@@ -16,6 +16,7 @@ import { sha256Hex, randomToken } from "../../infrastructure/crypto";
 import { KvRedirectCache } from "../../infrastructure/kv-redirect-cache";
 import { authorizationUrl, exchangeOAuthCode } from "../../infrastructure/oauth";
 import type { AppEvent, OAuthProvider, UserStatus, UserRole } from "../../shared/contracts";
+import { isReservedPath, normalizeAlias } from "../../shared/validation";
 import { ZodError } from "zod";
 
 interface Env {
@@ -85,6 +86,21 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
       return new Response(statusHtml(), { headers: { "content-type": "text/html; charset=utf-8" } });
     }
     return json({ ok: true, service: "prawurl-api", checkedAt: new Date().toISOString() });
+  }
+
+  const publicResolve = path.match(/^public\/resolve\/(.+)$/);
+  if (publicResolve && request.method === "GET") {
+    const alias = normalizeAlias(decodeURIComponent(publicResolve[1]).replace(/^\/+|\/+$/g, ""));
+    if (isReservedPath(alias)) {
+      return json({ error: "NOT_FOUND" }, 404);
+    }
+
+    const link = await services.links.findByAlias(alias);
+    if (!link || link.status !== "active" || (link.expiresAt && Date.parse(link.expiresAt) <= Date.now())) {
+      return json({ error: "NOT_FOUND" }, 404);
+    }
+
+    return json({ destinationUrl: link.destinationUrl });
   }
 
   if (path === "auth/session") {
@@ -260,6 +276,7 @@ function makeServices(env: Env) {
 
   return {
     users,
+    links,
     sessions,
     auditLogs,
     metrics: new D1MetricsRepository(env.DB),

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import type * as React from "react";
 import {
   Activity,
+  ArrowLeft,
   BarChart3,
   Check,
+  ChevronsUpDown,
   Command,
   Copy,
   Github,
@@ -42,6 +44,7 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "../components/ui/sidebar";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
@@ -91,7 +94,16 @@ export function App() {
     return <StatusPage theme={theme} onToggleTheme={toggleTheme} />;
   }
 
+  if (host === "prawurl.com" && isPotentialShortLinkPath(path)) {
+    return <ShortLinkFallback alias={path.replace(/^\/+|\/+$/g, "")} theme={theme} onToggleTheme={toggleTheme} />;
+  }
+
   return <MarketingPage theme={theme} onToggleTheme={toggleTheme} />;
+}
+
+function isPotentialShortLinkPath(path: string): boolean {
+  const alias = path.replace(/^\/+|\/+$/g, "");
+  return Boolean(alias) && !alias.includes(".") && !["app", "api", "admin", "login", "logout", "pricing", "terms", "privacy", "status", "assets"].includes(alias);
 }
 
 function MarketingPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
@@ -150,6 +162,39 @@ function MarketingPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: 
   );
 }
 
+function ShortLinkFallback({ alias, theme, onToggleTheme }: { alias: string; theme: Theme; onToggleTheme: () => void }) {
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    api
+      .resolvePublicAlias(alias)
+      .then(({ destinationUrl }) => window.location.replace(destinationUrl))
+      .catch(() => setError(true));
+  }, [alias]);
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-background px-6">
+      <div className="absolute right-6 top-6">
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>{error ? "Link não encontrado" : "Abrindo link"}</CardTitle>
+          <CardDescription>
+            {error ? "Esse alias não está disponível ou foi desativado." : "Estamos redirecionando você para o destino correto."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={() => (window.location.href = "/")}>
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Button>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+
 function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const [session, setSession] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,28 +212,22 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
   }
 
   if (!session) {
-    return <LoginPage />;
+    return <LoginPage theme={theme} onToggleTheme={onToggleTheme} />;
   }
 
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <LinkIcon className="size-4" />
-                </div>
-
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">PrawURL</span>
-                  <span className="truncate text-xs text-muted-foreground">Encurtador de URLs</span>
-                </div>
-
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <div className="flex h-12 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <LinkIcon className="size-4" />
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-semibold">PrawURL</span>
+              <span className="truncate text-xs text-muted-foreground">Encurtador de URLs</span>
+            </div>
+          </div>
         </SidebarHeader>
 
         <SidebarContent>
@@ -226,10 +265,10 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg">
+                  <SidebarMenuButton size="lg" tooltip="Conta">
                     <Avatar user={session.user} />
 
-                    <div className="grid flex-1 text-left text-sm leading-tight">
+                    <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                       <span className="truncate font-medium">
                         {session.user.name ?? session.user.email}
                       </span>
@@ -237,6 +276,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
                         {session.user.email}
                       </span>
                     </div>
+                    <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
 
@@ -288,12 +328,11 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <div className="text-sm font-medium">Dashboard</div>
+        <header className="sticky top-0 z-20 flex h-10 items-center bg-background/95 px-3 backdrop-blur">
+          <SidebarTrigger className="h-7 w-7 p-0" />
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden p-6 md:p-8">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 pt-2 md:p-8 md:pt-4">
           {view === "links" && <LinksView />}
           {view === "analytics" && <AnalyticsView />}
           {view === "admin" && session.user.role === "admin" && <AdminView />}
@@ -304,25 +343,49 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
   );
 }
 
-function LoginPage() {
+function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: () => void }) {
   return (
-    <main className="grid min-h-screen place-items-center px-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Entrar no PrawURL</CardTitle>
-          <CardDescription>Use Google ou GitHub para criar e gerenciar seus links.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          <Button onClick={() => (window.location.href = authUrl("google"))}>
-            <Lock className="h-4 w-4" />
-            Continuar com Google
-          </Button>
-          <Button variant="outline" onClick={() => (window.location.href = authUrl("github"))}>
-            <Github className="h-4 w-4" />
-            Continuar com GitHub
-          </Button>
-        </CardContent>
-      </Card>
+    <main className="min-h-screen bg-background px-6 py-6">
+      <header className="mx-auto flex max-w-5xl items-center justify-between">
+        <Button variant="ghost" onClick={() => (window.location.href = "https://prawurl.com")}>
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </Button>
+        {theme && onToggleTheme && <ThemeToggle theme={theme} onToggle={onToggleTheme} />}
+      </header>
+
+      <section className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-5xl items-center gap-10 py-8 lg:grid-cols-[1fr_420px]">
+        <div className="max-w-xl">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <LinkIcon className="h-6 w-6" />
+          </div>
+          <Badge className="mb-4 border-primary/20 bg-primary/10 text-primary">PrawURL Workspace</Badge>
+          <h1 className="text-4xl font-semibold tracking-normal md:text-5xl">Entre para gerenciar seus links.</h1>
+          <p className="mt-4 text-lg leading-8 text-muted-foreground">
+            Crie aliases, acompanhe cliques, organize tags e mantenha seus redirects sob controle em um painel simples.
+          </p>
+        </div>
+
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Entrar no PrawURL</CardTitle>
+            <CardDescription>Use uma conta social para continuar. A criação de conta é automática.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <Button onClick={() => (window.location.href = authUrl("google"))}>
+              <GoogleIcon className="h-4 w-4" />
+              Continuar com Google
+            </Button>
+            <Button variant="outline" onClick={() => (window.location.href = authUrl("github"))}>
+              <Github className="h-4 w-4" />
+              Continuar com GitHub
+            </Button>
+            <p className="pt-2 text-xs leading-5 text-muted-foreground">
+              Ao continuar, você aceita usar o PrawURL para criar e auditar links curtos públicos.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
     </main>
   );
 }
@@ -481,7 +544,7 @@ function UsersTable({ users }: { users: User[] }) {
         <CardDescription>Status, papéis e cadastros da plataforma.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
+        <Table className="min-w-[760px]">
           <TableHeader>
             <TableRow>
               <TableHead>Email</TableHead>
@@ -551,7 +614,7 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
         <CardDescription>Lista operacional dos links encurtados.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
+        <Table className="min-w-[820px]">
           <TableHeader>
             <TableRow>
               <TableHead>Curto</TableHead>
@@ -567,7 +630,9 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
               <TableRow key={link.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
-                    <span>prawurl.com/{link.alias}</span>
+                    <a className="text-primary underline-offset-4 hover:underline" href={`https://prawurl.com/${link.alias}`} target="_blank" rel="noreferrer">
+                      prawurl.com/{link.alias}
+                    </a>
                     <CopyLinkButton value={`https://prawurl.com/${link.alias}`} />
                   </div>
                   {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
@@ -650,13 +715,24 @@ function Avatar({ user }: { user: User }) {
   const fallback = (user.name ?? user.email).slice(0, 2).toUpperCase();
 
   if (user.avatarUrl) {
-    return <img src={user.avatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" referrerPolicy="no-referrer" />;
+    return <img src={user.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" referrerPolicy="no-referrer" />;
   }
 
   return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
       {fallback}
     </div>
+  );
+}
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M21.6 12.23c0-.78-.07-1.53-.2-2.23H12v4.22h5.37a4.59 4.59 0 0 1-1.99 3.01v2.5h3.22c1.89-1.74 3-4.3 3-7.5Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.42l-3.22-2.5c-.9.6-2.04.95-3.39.95-2.6 0-4.8-1.76-5.59-4.12H3.08v2.59A9.99 9.99 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.08a10.01 10.01 0 0 0 0 9l3.33-2.59Z" />
+      <path fill="#EA4335" d="M12 5.97c1.47 0 2.8.51 3.84 1.5l2.86-2.86A9.61 9.61 0 0 0 12 2 9.99 9.99 0 0 0 3.08 7.5l3.33 2.59C7.2 7.73 9.4 5.97 12 5.97Z" />
+    </svg>
   );
 }
 
@@ -702,9 +778,22 @@ function NavButton({
   icon: React.ReactElement;
   active?: boolean;
 }) {
+  const label = typeof children === "string" ? children : undefined;
+  const { isMobile, setOpenMobile } = useSidebar();
+
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={active} {...props}>
+      <SidebarMenuButton
+        isActive={active}
+        tooltip={label}
+        {...props}
+        onClick={(event) => {
+          props.onClick?.(event);
+          if (isMobile) {
+            setOpenMobile(false);
+          }
+        }}
+      >
         {icon}
         <span>{children}</span>
       </SidebarMenuButton>

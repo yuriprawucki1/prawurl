@@ -53,7 +53,13 @@ export default {
       })
     );
 
-    return Response.redirect(entry.destinationUrl, entry.redirectCode);
+    return new Response(null, {
+      status: entry.redirectCode,
+      headers: {
+        location: entry.destinationUrl,
+        "cache-control": "no-store"
+      }
+    });
   }
 };
 
