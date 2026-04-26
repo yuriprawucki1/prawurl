@@ -614,22 +614,21 @@ function LinkEditorDialog({
           inputMode="url"
         />
       </div>
-      <div className="grid gap-2 md:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Alias</Label>
-          <Input
-            value={form.alias}
-            onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
-            placeholder="Opcional"
-            disabled={mode === "edit"}
-          />
-          {mode === "edit" && <p className="text-xs text-muted-foreground">O alias fica travado na edição para evitar quebra de links existentes.</p>}
+        <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label>Alias</Label>
+            <Input
+              value={form.alias}
+              onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
+              placeholder="Opcional"
+              disabled={mode === "edit"}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Título</Label>
+            <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
+          </div>
         </div>
-        <div className="grid gap-2">
-          <Label>Título</Label>
-          <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Título opcional" />
-        </div>
-      </div>
       <div className="grid gap-2">
         <Label>Tags</Label>
         <Input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="portfolio, pessoal" />
@@ -637,40 +636,30 @@ function LinkEditorDialog({
       <div className="grid gap-2 md:grid-cols-2">
         <div className="grid gap-2">
           <Label>Senha</Label>
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-            <Input
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder={mode === "edit" ? "Deixe em branco para manter" : "Opcional"}
-            />
-            <div className="flex min-h-10 items-center gap-2">
-              {mode === "edit" ? (
-                hasPassword ? (
-                  <>
-                    <Badge className="gap-1 font-mono tracking-[0.2em]">
-                      <Lock className="h-3 w-3" />
-                      ••••••
-                    </Badge>
-                    <Button
-                      type="button"
-                      variant={form.clearPassword ? "destructive" : "outline"}
-                      size="sm"
-                      onClick={() => setForm((current) => ({ ...current, clearPassword: !current.clearPassword }))}
-                      className="shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {form.clearPassword ? "Senha será removida" : "Remover senha"}
-                    </Button>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Sem senha definida</span>
-                )
-              ) : (
-                <span className="text-xs text-muted-foreground">Opcional</span>
-              )}
+          <Input
+            type="password"
+            value={form.password}
+            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            placeholder={mode === "edit" ? "Deixe em branco para manter" : "Opcional"}
+          />
+          {mode === "edit" && hasPassword && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="gap-1">
+                <Lock className="h-3 w-3" />
+                Senha definida
+              </Badge>
+              <Button
+                type="button"
+                variant={form.clearPassword ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => setForm((current) => ({ ...current, clearPassword: !current.clearPassword }))}
+                className="shrink-0"
+              >
+                <Trash2 className="h-4 w-4" />
+                {form.clearPassword ? "Senha será removida" : "Remover senha"}
+              </Button>
             </div>
-          </div>
+          )}
         </div>
         <div className="grid gap-2">
           <Label>Redirect</Label>
@@ -826,7 +815,7 @@ function DateTimePickerField({
             <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[22rem] p-3">
+        <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-3">
           <div className="grid gap-3">
             <div className="flex items-center justify-between gap-2">
               <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
@@ -963,7 +952,7 @@ function LinksList({
             </div>
             <div className="flex max-h-24 flex-col items-start gap-1 overflow-hidden pr-1">
               {signalLabels(link).slice(0, 3).map((signal) => (
-                <Badge key={signal} className="w-full max-w-full truncate">
+                <Badge key={signal} className="w-fit max-w-full">
                   {signal}
                 </Badge>
               ))}
@@ -1003,7 +992,7 @@ function LinksList({
                 {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead className="w-24">Cliques</TableHead>
-                <TableHead className="w-[10rem]">Sinais</TableHead>
+                <TableHead className="w-28">Sinais</TableHead>
                 {hasActions && <TableHead className="w-14">Ações</TableHead>}
               </TableRow>
             </TableHeader>
@@ -1045,9 +1034,9 @@ function LinksList({
                   </TableCell>
                   <TableCell>{link.clickCount}</TableCell>
                   <TableCell>
-                    <div className="flex max-h-24 max-w-40 flex-col items-start gap-1 overflow-hidden pr-1">
+                    <div className="flex max-h-24 max-w-28 flex-col items-start gap-1 overflow-hidden pr-1">
                       {signalLabels(link).slice(0, 3).map((signal) => (
-                        <Badge key={signal} className="w-full max-w-full truncate">
+                        <Badge key={signal} className="w-fit max-w-full">
                           {signal}
                         </Badge>
                       ))}
@@ -1056,7 +1045,7 @@ function LinksList({
                   </TableCell>
                   {hasActions && (
                     <TableCell className="whitespace-nowrap">
-                      <div className="flex justify-end">
+                      <div className="flex justify-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button size="icon-sm" variant="ghost" aria-label="Abrir ações do link">
@@ -1435,7 +1424,7 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
               {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
               <TableHead className="w-28">Status</TableHead>
               <TableHead className="w-24">Cliques</TableHead>
-              <TableHead className="w-[10rem]">Sinais</TableHead>
+              <TableHead className="w-28">Sinais</TableHead>
               {hasActions && <TableHead className="w-14">Ações</TableHead>}
             </TableRow>
           </TableHeader>
