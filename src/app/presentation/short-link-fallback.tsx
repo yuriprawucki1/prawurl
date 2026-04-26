@@ -82,10 +82,10 @@ export function ShortLinkFallback({
     }
   }
 
-  const showPasswordForm = state.kind === "loading" || state.kind === "password_required";
+  const showPasswordForm = state.kind === "password_required";
   const description =
     state.kind === "loading"
-      ? "Verificando link protegido."
+      ? "Verificando se este link exige senha."
       : "message" in state
         ? state.message
         : "Redirecionando.";
@@ -105,6 +105,13 @@ export function ShortLinkFallback({
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
+          {state.kind === "loading" && (
+            <div className="grid gap-3">
+              <div className="h-10 rounded-md border bg-muted/40" />
+              <div className="h-10 rounded-md border bg-muted/40" />
+            </div>
+          )}
+
           {showPasswordForm && (
             <form className="grid gap-3" onSubmit={submit}>
               <Input

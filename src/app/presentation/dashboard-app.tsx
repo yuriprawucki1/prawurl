@@ -31,6 +31,7 @@ import {
 } from "../components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { TooltipProvider } from "../components/ui/tooltip";
+import { ToastProvider } from "../components/ui/toast";
 import { Theme } from "./theme";
 import { FullScreenMessage } from "./full-screen-message";
 import { LoginPage } from "./login-page";
@@ -68,83 +69,85 @@ export function DashboardApp({
 
   return (
     <TooltipProvider delayDuration={100}>
-      <SidebarProvider className="overflow-x-hidden">
-        <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <div className="flex h-12 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <LinkIcon className="size-4" />
-            </div>
-            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-              <span className="truncate font-semibold">PrawURL</span>
-              <span className="truncate text-xs text-muted-foreground">Encurtador de URLs</span>
-            </div>
-          </div>
-        </SidebarHeader>
+      <ToastProvider>
+        <SidebarProvider className="overflow-x-hidden">
+          <Sidebar collapsible="icon">
+            <SidebarHeader>
+              <div className="flex h-12 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <LinkIcon className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-semibold">PrawURL</span>
+                  <span className="truncate text-xs text-muted-foreground">Encurtador de URLs</span>
+                </div>
+              </div>
+            </SidebarHeader>
 
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
-            <SidebarGroupContent>
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <NavButton active={view === "links"} onClick={() => setView("links")} icon={<LinkIcon />}>
+                      Links
+                    </NavButton>
+                    <NavButton active={view === "analytics"} onClick={() => setView("analytics")} icon={<BarChart3 />}>
+                      Analytics
+                    </NavButton>
+                    {session.user.role === "admin" && (
+                      <>
+                        <NavButton active={view === "admin"} onClick={() => setView("admin")} icon={<Shield />}>
+                          Admin
+                        </NavButton>
+                        <NavButton active={view === "logs"} onClick={() => setView("logs")} icon={<Command />}>
+                          Auditoria
+                        </NavButton>
+                      </>
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+
+            <SidebarFooter>
               <SidebarMenu>
-                <NavButton active={view === "links"} onClick={() => setView("links")} icon={<LinkIcon />}>
-                  Links
-                </NavButton>
-                <NavButton active={view === "analytics"} onClick={() => setView("analytics")} icon={<BarChart3 />}>
-                  Analytics
-                </NavButton>
-                {session.user.role === "admin" && (
-                  <>
-                    <NavButton active={view === "admin"} onClick={() => setView("admin")} icon={<Shield />}>
-                      Admin
-                    </NavButton>
-                    <NavButton active={view === "logs"} onClick={() => setView("logs")} icon={<Command />}>
-                      Auditoria
-                    </NavButton>
-                  </>
-                )}
+                <SidebarMenuItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton size="lg" tooltip="Conta">
+                        <Avatar user={session.user} />
+                        <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                          <span className="truncate font-medium">{session.user.name ?? session.user.email}</span>
+                          <span className="truncate text-xs text-sidebar-foreground/80">{session.user.email}</span>
+                        </div>
+                        <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+
+                    <UserMenuContent session={session} theme={theme} onToggleTheme={onToggleTheme} publicOrigin={publicOrigin} />
+                  </DropdownMenu>
+                </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
+            </SidebarFooter>
 
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg" tooltip="Conta">
-                    <Avatar user={session.user} />
-                    <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                      <span className="truncate font-medium">{session.user.name ?? session.user.email}</span>
-                      <span className="truncate text-xs text-sidebar-foreground/80">{session.user.email}</span>
-                    </div>
-                    <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
+            <SidebarRail />
+          </Sidebar>
 
-                <UserMenuContent session={session} theme={theme} onToggleTheme={onToggleTheme} publicOrigin={publicOrigin} />
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
+          <SidebarInset>
+            <header className="sticky top-0 z-20 flex h-12 items-center bg-background/95 px-3 backdrop-blur md:h-8 md:px-2">
+              <SidebarTrigger className="h-9 w-9 p-0 md:h-6 md:w-6 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-3.5 md:[&_svg]:w-3.5" />
+            </header>
 
-        <SidebarRail />
-        </Sidebar>
-
-        <SidebarInset>
-          <header className="sticky top-0 z-20 flex h-12 items-center bg-background/95 px-3 backdrop-blur md:h-8 md:px-2">
-            <SidebarTrigger className="h-9 w-9 p-0 md:h-6 md:w-6 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-3.5 md:[&_svg]:w-3.5" />
-          </header>
-
-          <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 pt-2 md:p-8 md:pt-4">
-            {view === "links" && <LinksView />}
-            {view === "analytics" && <AnalyticsView />}
-            {view === "admin" && session.user.role === "admin" && <AdminView />}
-            {view === "logs" && session.user.role === "admin" && <AuditLogsView />}
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
+            <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 pt-2 md:p-8 md:pt-4">
+              {view === "links" && <LinksView />}
+              {view === "analytics" && <AnalyticsView />}
+              {view === "admin" && session.user.role === "admin" && <AdminView />}
+              {view === "logs" && session.user.role === "admin" && <AuditLogsView />}
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+      </ToastProvider>
     </TooltipProvider>
   );
 }

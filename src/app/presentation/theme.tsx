@@ -20,9 +20,17 @@ export function useTheme(publicOrigin: string) {
       return cookieTheme;
     }
 
-    const stored = window.localStorage.getItem(themeStorageKey);
-    if (stored === "light" || stored === "dark") {
-      return stored;
+    try {
+      const stored = window.localStorage.getItem(themeStorageKey);
+      if (stored === "light" || stored === "dark") {
+        return stored;
+      }
+    } catch {
+      // Ignore storage access failures and fall back below.
+    }
+
+    if (document.documentElement.classList.contains("dark")) {
+      return "dark";
     }
 
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -31,10 +39,15 @@ export function useTheme(publicOrigin: string) {
   useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   useEffect(() => {
-    window.localStorage.setItem(themeStorageKey, theme);
+    try {
+      window.localStorage.setItem(themeStorageKey, theme);
+    } catch {
+      // Ignore storage access failures and continue writing the cookie.
+    }
     writeThemeCookie(theme, publicOrigin);
   }, [publicOrigin, theme]);
 

@@ -51,6 +51,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
 import { Skeleton } from "../components/ui/skeleton";
+import { useToast } from "../components/ui/toast";
 
 type AdminTab = "users" | "links" | "blocklist";
 type EditorMode = "create" | "edit";
@@ -87,7 +88,7 @@ export function AnalyticsView() {
   const pinnedLinks = useMemo(() => links.filter((link) => link.pinned).length, [links]);
 
   return (
-    <section className="grid gap-6">
+    <section className="grid min-w-0 gap-6">
       <PageTitle title="Analytics" description="Um panorama rápido dos seus links e sinais de proteção." />
       {loading ? (
         <div className="grid gap-4 md:grid-cols-4">
@@ -104,7 +105,7 @@ export function AnalyticsView() {
           <MetricCard title="Fixados" value={pinnedLinks} />
         </div>
       )}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Top links</CardTitle>
           <CardDescription>Os links mais usados aparecem primeiro.</CardDescription>
@@ -139,7 +140,7 @@ export function AdminView() {
   }, [refresh]);
 
   return (
-    <section className="grid gap-6">
+    <section className="grid min-w-0 gap-6">
       <PageTitle title="Admin" description="Operação da plataforma, governança e blocklist interna." />
       {summary ? (
         <div className="grid gap-4 md:grid-cols-4">
@@ -200,9 +201,9 @@ export function AuditLogsView() {
   }, []);
 
   return (
-    <section className="grid gap-6">
+    <section className="grid min-w-0 gap-6">
       <PageTitle title="Auditoria" description="Eventos persistentes de autenticação, links, admin e segurança." />
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Eventos recentes</CardTitle>
           <CardDescription>Use esta visão para entender quem fez o quê, quando e em qual entidade.</CardDescription>
@@ -249,6 +250,7 @@ function LinkWorkspace({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const hasLoadedRef = useRef(false);
+  const { toast } = useToast();
 
   const refresh = useCallback(() => {
     if (hasLoadedRef.current) {
@@ -329,7 +331,7 @@ function LinkWorkspace({
   }
 
   return (
-    <section className="grid gap-6" aria-busy={refreshing}>
+    <section className="grid min-w-0 gap-6" aria-busy={refreshing}>
       <PageTitle title={title} description={description} />
 
       <Card>
@@ -351,7 +353,7 @@ function LinkWorkspace({
             <MobileFiltersSheet filters={filters} onChange={setFilters} />
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4">
+        <CardContent className="grid min-w-0 gap-4">
           {selectedIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm">
               <span className="font-medium">{selectedIds.length} selecionados</span>
@@ -431,6 +433,10 @@ function LinkWorkspace({
           }
           await deleteLink(deleteTarget.id);
           setSelectedIds((current) => current.filter((selected) => selected !== deleteTarget.id));
+          toast({
+            title: "Link excluído",
+            description: `${deleteTarget.alias} foi removido com sucesso.`
+          });
           setDeleteTarget(null);
           refresh();
         }}
@@ -666,37 +672,19 @@ function LinkEditorDialog({
         </div>
       )}
       <div className="grid gap-2 md:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Países permitidos</Label>
-          <Input
-            list="country-code-options"
-            value={form.countryAllowlist}
-            onChange={(event) => setForm((current) => ({ ...current, countryAllowlist: event.target.value }))}
-            placeholder="BR, US"
-            autoCapitalize="characters"
-            autoCorrect="off"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Países bloqueados</Label>
-          <Input
-            list="country-code-options"
-            value={form.countryBlocklist}
-            onChange={(event) => setForm((current) => ({ ...current, countryBlocklist: event.target.value }))}
-            placeholder="RU, CN"
-            autoCapitalize="characters"
-            autoCorrect="off"
-          />
-        </div>
+        <CountryMultiSelectField
+          label="Países permitidos"
+          placeholder="Buscar e adicionar países"
+          value={form.countryAllowlist}
+          onChange={(value) => setForm((current) => ({ ...current, countryAllowlist: value }))}
+        />
+        <CountryMultiSelectField
+          label="Países bloqueados"
+          placeholder="Buscar e adicionar países"
+          value={form.countryBlocklist}
+          onChange={(value) => setForm((current) => ({ ...current, countryBlocklist: value }))}
+        />
       </div>
-      <datalist id="country-code-options">
-        {COUNTRY_SUGGESTIONS.map((country) => (
-          <option key={country.code} value={country.code}>
-            {country.label}
-          </option>
-        ))}
-      </datalist>
-      <p className="text-xs text-muted-foreground">Digite um ou mais códigos ISO, separados por vírgula. O campo sugere os códigos mais usados.</p>
       <div className="flex flex-wrap gap-4">
         <label className="flex items-center gap-2 text-sm">
           <input checked={form.favorite} onChange={(event) => setForm((current) => ({ ...current, favorite: event.target.checked }))} type="checkbox" />
@@ -770,8 +758,8 @@ function LinksList({
   const hasActions = Boolean(onEdit || onRequestDelete || onRequestQr || onToggleFavorite || onTogglePinned);
 
   return (
-    <div className="grid gap-3">
-      <div className="grid gap-3 md:hidden">
+    <div className="grid min-w-0 gap-3">
+      <div className="grid min-w-0 gap-3 md:hidden">
         {links.map((link) => (
           <div key={link.id} className="grid gap-3 rounded-md border p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
@@ -832,7 +820,7 @@ function LinksList({
         ))}
       </div>
 
-      <div className="hidden md:block">
+      <div className="hidden min-w-0 md:block">
         <div className="overflow-x-auto rounded-md border">
           <Table className="min-w-[1280px] table-fixed">
             <TableHeader>
@@ -989,7 +977,7 @@ function BlocklistPanel({
   }
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>Blocklist interna</CardTitle>
         <CardDescription>Domínios proibidos manualmente e usados pelo safe browsing básico.</CardDescription>
@@ -1001,7 +989,7 @@ function BlocklistPanel({
           <Button type="submit">Adicionar</Button>
         </form>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {loading ? <BlocklistSkeleton /> : <div className="grid gap-3">{blockedDomains.map((entry) => <BlocklistRow key={entry.domain} entry={entry} onRemove={() => remove(entry.domain)} />)}</div>}
+        {loading ? <BlocklistSkeleton /> : <div className="grid min-w-0 gap-3">{blockedDomains.map((entry) => <BlocklistRow key={entry.domain} entry={entry} onRemove={() => remove(entry.domain)} />)}</div>}
       </CardContent>
     </Card>
   );
@@ -1009,7 +997,7 @@ function BlocklistPanel({
 
 function UsersTable({ users, loading }: { users: User[]; loading: boolean }) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>Usuários recentes</CardTitle>
         <CardDescription>Status, papéis e cadastros da plataforma.</CardDescription>
@@ -1024,7 +1012,7 @@ function UsersTable({ users, loading }: { users: User[]; loading: boolean }) {
 function UsersTableContent({ users }: { users: User[] }) {
   return (
     <>
-      <div className="grid gap-3 md:hidden">
+      <div className="grid min-w-0 gap-3 md:hidden">
         {users.map((user) => (
           <div key={user.id} className="grid gap-2 rounded-md border p-3 text-sm">
             <div className="font-medium">{user.email}</div>
@@ -1036,7 +1024,7 @@ function UsersTableContent({ users }: { users: User[] }) {
           </div>
         ))}
       </div>
-      <div className="hidden md:block">
+      <div className="hidden min-w-0 md:block">
         <Table className="min-w-[760px]">
           <TableHeader>
             <TableRow>
@@ -1067,7 +1055,7 @@ function UsersTableContent({ users }: { users: User[] }) {
 function AuditLogsList({ logs }: { logs: AuditLog[] }) {
   return (
     <>
-      <div className="grid gap-3 md:hidden">
+      <div className="grid min-w-0 gap-3 md:hidden">
         {logs.map((log) => (
           <div key={log.id} className="grid gap-2 rounded-md border p-3 text-sm">
             <div className="flex items-center justify-between gap-2">
@@ -1086,7 +1074,7 @@ function AuditLogsList({ logs }: { logs: AuditLog[] }) {
           </div>
         ))}
       </div>
-      <div className="hidden md:block">
+      <div className="hidden min-w-0 md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -1240,8 +1228,8 @@ function QrCodeDialog({
 
 function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; hasActions: boolean }) {
   return (
-    <div className="grid gap-3 rounded-md border p-3">
-      <div className="grid gap-3 md:hidden">
+    <div className="grid min-w-0 gap-3 rounded-md border p-3">
+      <div className="grid min-w-0 gap-3 md:hidden">
         {[0, 1, 2].map((index) => (
           <div key={index} className="grid gap-3 rounded-md border p-3">
             <div className="flex items-start justify-between gap-3">
@@ -1264,7 +1252,7 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
           </div>
         ))}
       </div>
-      <div className="hidden md:block">
+      <div className="hidden min-w-0 md:block">
           <Table className="min-w-[1280px] table-fixed">
             <TableHeader>
               <TableRow>
@@ -1330,7 +1318,7 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
 
 function MetricCardSkeleton() {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-9 w-24" />
@@ -1341,7 +1329,7 @@ function MetricCardSkeleton() {
 
 function AuditLogsSkeleton() {
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 gap-3">
       {[0, 1, 2, 3].map((index) => (
         <div key={index} className="grid gap-2 rounded-md border p-3">
           <Skeleton className="h-4 w-40" />
@@ -1359,7 +1347,7 @@ function AuditLogsSkeleton() {
 
 function BlocklistSkeleton() {
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 gap-3">
       {[0, 1, 2].map((index) => (
         <div key={index} className="flex items-center justify-between gap-3 rounded-md border p-3">
           <div className="grid gap-2">
@@ -1387,9 +1375,127 @@ function BlocklistRow({ entry, onRemove }: { entry: BlockedDomainEntry; onRemove
   );
 }
 
+function CountryMultiSelectField({
+  label,
+  placeholder,
+  value,
+  onChange
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const selected = useMemo(() => parseDelimited(value).map((item) => item.toUpperCase()), [value]);
+  const suggestionMap = useMemo(() => new Map(COUNTRY_SUGGESTIONS.map((country) => [country.code, country])), []);
+  const queryLower = query.trim().toLowerCase();
+  const suggestions = useMemo(() => {
+    return COUNTRY_SUGGESTIONS.filter((country) => {
+      if (selected.includes(country.code)) {
+        return false;
+      }
+      if (!queryLower) {
+        return true;
+      }
+      return country.code.toLowerCase().includes(queryLower) || country.label.toLowerCase().includes(queryLower);
+    }).slice(0, 8);
+  }, [queryLower, selected]);
+
+  function addCountry(code: string) {
+    const normalized = code.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(normalized) || selected.includes(normalized)) {
+      setQuery("");
+      return;
+    }
+
+    const next = [...selected, normalized];
+    onChange(next.join(", "));
+    setQuery("");
+  }
+
+  function removeCountry(code: string) {
+    onChange(selected.filter((item) => item !== code).join(", "));
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace" && !query && selected.length > 0) {
+      event.preventDefault();
+      removeCountry(selected[selected.length - 1]);
+      return;
+    }
+
+    if (event.key !== "Enter" && event.key !== "," && event.key !== "Tab") {
+      return;
+    }
+
+    const candidate = suggestions[0]?.code ?? query.trim();
+    if (!candidate) {
+      return;
+    }
+
+    event.preventDefault();
+    addCountry(candidate);
+  }
+
+  return (
+    <div className="grid min-w-0 gap-2">
+      <Label>{label}</Label>
+      <div className="rounded-md border bg-background p-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {selected.map((code) => {
+            const item = suggestionMap.get(code);
+            return (
+              <Badge key={code} className="inline-flex max-w-full items-center gap-1 pr-1.5">
+                <span className="truncate">
+                  {code}
+                  {item ? ` · ${item.label}` : ""}
+                </span>
+                <button
+                  type="button"
+                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => removeCountry(code)}
+                  aria-label={`Remover ${code}`}
+                >
+                  ×
+                </button>
+              </Badge>
+            );
+          })}
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value.toUpperCase())}
+            onKeyDown={handleKeyDown}
+            placeholder={selected.length === 0 ? placeholder : "Adicionar país"}
+            className="min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-sm outline-none placeholder:text-muted-foreground"
+            autoCapitalize="characters"
+            autoCorrect="off"
+          />
+        </div>
+        {query.trim() && suggestions.length > 0 && (
+          <div className="mt-2 max-h-52 overflow-auto rounded-md border bg-popover p-1 shadow-sm">
+            {suggestions.map((country) => (
+              <button
+                key={country.code}
+                type="button"
+                className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                onClick={() => addCountry(country.code)}
+              >
+                <span>{country.label}</span>
+                <span className="text-xs text-muted-foreground">{country.code}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">Selecione vários países. Digite um código ou o nome para filtrar.</p>
+    </div>
+  );
+}
+
 function UsersTableSkeleton() {
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 gap-3">
       <div className="grid gap-3 md:hidden">
         {[0, 1, 2].map((index) => (
           <div key={index} className="grid gap-2 rounded-md border p-3">
