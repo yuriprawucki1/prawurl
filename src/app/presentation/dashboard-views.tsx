@@ -90,7 +90,7 @@ export function AnalyticsView() {
   const pinnedLinks = useMemo(() => links.filter((link) => link.pinned).length, [links]);
 
   return (
-    <section className="grid min-w-0 gap-6">
+    <section className="grid min-w-0 gap-6 overflow-x-hidden">
       <PageTitle title="Analytics" description="Um panorama rápido dos seus links e sinais de proteção." />
       {loading ? (
         <div className="grid gap-4 md:grid-cols-4">
@@ -142,7 +142,7 @@ export function AdminView() {
   }, [refresh]);
 
   return (
-    <section className="grid min-w-0 gap-6">
+    <section className="grid min-w-0 gap-6 overflow-x-hidden">
       <PageTitle title="Admin" description="Operação da plataforma, governança e blocklist interna." />
       {summary ? (
         <div className="grid gap-4 md:grid-cols-4">
@@ -203,7 +203,7 @@ export function AuditLogsView() {
   }, []);
 
   return (
-    <section className="grid min-w-0 gap-6">
+    <section className="grid min-w-0 gap-6 overflow-x-hidden">
       <PageTitle title="Auditoria" description="Eventos persistentes de autenticação, links, admin e segurança." />
       <Card className="min-w-0">
         <CardContent className="pt-6">{loading ? <AuditLogsSkeleton /> : <AuditLogsList logs={logs} />}</CardContent>
@@ -286,14 +286,22 @@ function LinkWorkspace({
 
   async function submitLink(input: LinkFormInput) {
     setSaving(true);
-    setError(null);
     try {
       await saveLink(editingLink?.id ?? null, input);
       setEditorOpen(false);
       setEditingLink(null);
+      toast({
+        title: editingLink ? "Link atualizado" : "Link criado",
+        description: editingLink ? "As alterações foram salvas com sucesso." : "O novo link foi criado com sucesso."
+      });
       refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Erro ao salvar link.");
+      const message = saveError instanceof Error ? saveError.message : "Erro ao salvar link.";
+      toast({
+        title: editingLink ? "Falha ao salvar link" : "Falha ao criar link",
+        description: message
+      });
+      throw saveError instanceof Error ? saveError : new Error(message);
     } finally {
       setSaving(false);
     }
@@ -327,7 +335,7 @@ function LinkWorkspace({
   }
 
   return (
-    <section className="grid min-w-0 gap-6" aria-busy={refreshing}>
+    <section className="grid min-w-0 gap-6 overflow-x-hidden" aria-busy={refreshing}>
       <PageTitle title={title} description={description} />
 
       <Card className="min-w-0">
@@ -753,65 +761,70 @@ function LinksList({
     <div className="grid min-w-0 gap-3">
       <div className="grid min-w-0 gap-3 md:hidden">
         {links.map((link) => (
-          <div key={link.id} className="grid gap-3 rounded-md border p-3 text-sm">
-            <div className="flex items-start justify-between gap-3">
-              <label className="flex items-start gap-2">
+          <div key={link.id} className="grid gap-3 overflow-hidden rounded-md border p-3 text-sm">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <label className="flex min-w-0 flex-1 items-start gap-2">
                 {onToggleSelected && <input checked={selectedIds.includes(link.id)} onChange={() => onToggleSelected(link.id)} type="checkbox" className="mt-1" />}
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <a className="block truncate font-medium text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
                     {publicHostname}/{link.alias}
                   </a>
                   {link.title && <div className="truncate text-xs text-muted-foreground">{link.title}</div>}
                 </div>
               </label>
-            <div className="flex items-center gap-1">
-              <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
-              {onEdit && <MiniActionButton icon={<PencilLine className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
-              {onRequestQr && <MiniActionButton icon={<QrCode className="h-4 w-4" />} label="QR Code" onClick={() => onRequestQr(link)} />}
+              <div className="flex shrink-0 items-center gap-1">
+                <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
+                {onEdit && <MiniActionButton icon={<PencilLine className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
+                {onRequestQr && <MiniActionButton icon={<QrCode className="h-4 w-4" />} label="QR Code" onClick={() => onRequestQr(link)} />}
+              </div>
+            </div>
+            <div className="break-words text-xs text-muted-foreground">{link.destinationUrl}</div>
+            <div className="flex flex-col items-start gap-2 text-xs">
+              <Badge className="w-fit">{linkStatusLabel(link.status)}</Badge>
+              <Badge className="w-fit">{link.clickCount} cliques</Badge>
+              {link.passwordProtected && (
+                <Badge className="w-fit">
+                  <Lock className="mr-1 h-3 w-3" />
+                  Senha
+                </Badge>
+              )}
+              {link.favorite && <Badge className="w-fit">Favorito</Badge>}
+              {link.pinned && <Badge className="w-fit">Fixado</Badge>}
+              {showOwner && <Badge className="w-fit max-w-full truncate">{link.ownerEmail ?? shortId(link.ownerId)}</Badge>}
+            </div>
+            <div className="flex max-h-24 flex-col items-start gap-1 overflow-y-auto pr-1">
+              {link.tags.length > 0 ? (
+                link.tags.map((tag) => (
+                  <Badge key={tag} className="w-fit max-w-full gap-1">
+                    <Tags className="h-3 w-3" />
+                    <span className="truncate">{tag}</span>
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-xs text-muted-foreground">Sem tags</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {onToggleFavorite && (
+                <MiniActionButton
+                  icon={link.favorite ? <StarOff className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+                  label={link.favorite ? "Desfavoritar" : "Favoritar"}
+                  onClick={() => onToggleFavorite(link)}
+                />
+              )}
+              {onTogglePinned && (
+                <MiniActionButton
+                  icon={link.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                  label={link.pinned ? "Desafixar" : "Fixar"}
+                  onClick={() => onTogglePinned(link)}
+                />
+              )}
+              {onRequestDelete && (
+                <MiniActionButton icon={<Trash2 className="h-4 w-4" />} label="Excluir" onClick={() => onRequestDelete(link)} variant="destructive" />
+              )}
             </div>
           </div>
-          <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <Badge>{linkStatusLabel(link.status)}</Badge>
-            <Badge>{link.clickCount} cliques</Badge>
-            {link.passwordProtected && <Badge><Lock className="mr-1 h-3 w-3" />Senha</Badge>}
-            {link.favorite && <Badge>Favorito</Badge>}
-            {link.pinned && <Badge>Fixado</Badge>}
-            {showOwner && <Badge>{link.ownerEmail ?? shortId(link.ownerId)}</Badge>}
-          </div>
-          <div className="flex max-h-24 flex-col gap-1 overflow-y-auto pr-1">
-            {link.tags.length > 0 ? (
-              link.tags.map((tag) => (
-                <Badge key={tag} className="w-fit gap-1">
-                  <Tags className="h-3 w-3" />
-                  {tag}
-                </Badge>
-              ))
-            ) : (
-              <span className="text-xs text-muted-foreground">Sem tags</span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {onToggleFavorite && (
-              <MiniActionButton
-                icon={link.favorite ? <StarOff className="h-4 w-4" /> : <Star className="h-4 w-4" />}
-                label={link.favorite ? "Desfavoritar" : "Favoritar"}
-                onClick={() => onToggleFavorite(link)}
-              />
-            )}
-            {onTogglePinned && (
-              <MiniActionButton
-                icon={link.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                label={link.pinned ? "Desafixar" : "Fixar"}
-                onClick={() => onTogglePinned(link)}
-              />
-            )}
-            {onRequestDelete && (
-              <MiniActionButton icon={<Trash2 className="h-4 w-4" />} label="Excluir" onClick={() => onRequestDelete(link)} variant="destructive" />
-            )}
-          </div>
-        </div>
-      ))}
+        ))}
       </div>
 
       <div className="hidden min-w-0 md:block">
@@ -837,7 +850,7 @@ function LinksList({
                       <input checked={selectedIds.includes(link.id)} onChange={() => onToggleSelected(link.id)} type="checkbox" />
                     </TableCell>
                   )}
-                  <TableCell className="font-medium">
+                  <TableCell className="min-w-0 font-medium">
                     <div className="flex items-center gap-2">
                       <a className="text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
                         {publicHostname}/{link.alias}
@@ -846,13 +859,19 @@ function LinksList({
                     </div>
                     {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
                   </TableCell>
-                  <TableCell className="truncate">{link.destinationUrl}</TableCell>
-                  {showOwner && <TableCell className="truncate">{link.ownerEmail ?? shortId(link.ownerId)}</TableCell>}
+                  <TableCell className="min-w-0">
+                    <div className="max-w-full truncate">{link.destinationUrl}</div>
+                  </TableCell>
+                  {showOwner && (
+                    <TableCell className="min-w-0">
+                      <div className="max-w-full truncate">{link.ownerEmail ?? shortId(link.ownerId)}</div>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
-                      <Badge>{linkStatusLabel(link.status)}</Badge>
+                      <Badge className="w-fit shrink-0">{linkStatusLabel(link.status)}</Badge>
                       {link.passwordProtected && (
-                        <Badge>
+                        <Badge className="w-fit shrink-0">
                           <Lock className="mr-1 h-3 w-3" />
                           Senha
                         </Badge>
@@ -861,12 +880,12 @@ function LinksList({
                   </TableCell>
                   <TableCell>{link.clickCount}</TableCell>
                   <TableCell>
-                    <div className="flex max-h-24 max-w-48 flex-col gap-1 overflow-y-auto pr-1">
-                      {link.favorite && <Badge>Favorito</Badge>}
-                      {link.pinned && <Badge>Fixado</Badge>}
-                      {link.safetyStatus !== "clean" && <Badge>{link.safetyStatus}</Badge>}
-                      {link.countryAllowlist.length > 0 && <Badge>+{link.countryAllowlist.join(",")}</Badge>}
-                      {link.countryBlocklist.length > 0 && <Badge>-{link.countryBlocklist.join(",")}</Badge>}
+                    <div className="flex max-h-24 max-w-48 flex-col items-start gap-1 overflow-y-auto pr-1">
+                      {link.favorite && <Badge className="w-fit max-w-full">Favorito</Badge>}
+                      {link.pinned && <Badge className="w-fit max-w-full">Fixado</Badge>}
+                      {link.safetyStatus !== "clean" && <Badge className="w-fit max-w-full">{link.safetyStatus}</Badge>}
+                      {link.countryAllowlist.length > 0 && <Badge className="w-fit max-w-full truncate">+{link.countryAllowlist.join(",")}</Badge>}
+                      {link.countryBlocklist.length > 0 && <Badge className="w-fit max-w-full truncate">-{link.countryBlocklist.join(",")}</Badge>}
                     </div>
                   </TableCell>
                   {hasActions && (
@@ -1239,12 +1258,12 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
         ))}
       </div>
       <div className="hidden min-w-0 md:block">
-          <Table className="min-w-[960px] table-fixed">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Skeleton className="h-4 w-4" />
-                </TableHead>
+        <Table className="min-w-[960px] table-fixed">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">
+                <Skeleton className="h-4 w-4" />
+              </TableHead>
               <TableHead className="w-[14rem]">Curto</TableHead>
               <TableHead className="w-[18rem]">Destino</TableHead>
               {showOwner && <TableHead className="w-[14rem]">Dono</TableHead>}
@@ -1279,7 +1298,7 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
                   <Skeleton className="h-4 w-8" />
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  <div className="flex flex-col items-start gap-1">
                     <Skeleton className="h-5 w-16 rounded-full" />
                     <Skeleton className="h-5 w-16 rounded-full" />
                   </div>
@@ -1432,7 +1451,7 @@ function CountryMultiSelectField({
           {selected.map((code) => {
             const item = suggestionMap.get(code);
             return (
-              <Badge key={code} className="inline-flex max-w-full items-center gap-1 pr-1.5">
+              <Badge key={code} className="inline-flex max-w-full items-center gap-1 self-start pr-1.5">
                 <span className="truncate">
                   {code}
                   {item ? ` · ${item.label}` : ""}
