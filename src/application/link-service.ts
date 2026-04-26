@@ -1,8 +1,18 @@
-import type { CreateLinkInput, Link, LinkSummary, RedirectCacheEntry, UpdateLinkInput, User } from "../shared/contracts";
+import type {
+  CreateLinkInput,
+  Link,
+  LinkBulkActionInput,
+  LinkExportInput,
+  LinkListFilters,
+  LinkSummary,
+  UpdateLinkInput,
+  User
+} from "../shared/contracts";
 import { createLinkSchema, updateLinkSchema } from "../shared/validation";
 import { AliasPolicy } from "../domain/alias-policy";
 import { UrlPolicy } from "../domain/url-policy";
 import type { AuditLogRepository, LinkRepository, RedirectCache } from "../domain/ports";
+import { analyzeDestinationSafety, extractDestinationDomain, hashPassword, normalizeCountryCodes } from "../infrastructure/link-security";
 
 export class LinkService {
   constructor(
@@ -17,7 +27,10 @@ export class LinkService {
     const parsed = createLinkSchema.parse(input);
     const alias = await this.aliasPolicy.validate(parsed.alias ?? crypto.randomUUID().slice(0, 8));
     const destinationUrl = await this.urlPolicy.validate(parsed.destinationUrl);
+    const destinationDomain = extractDestinationDomain(destinationUrl);
+    const safety = analyzeDestinationSafety(destinationUrl);
     const now = new Date().toISOString();
+    const password = await this.createPasswordState(parsed.password);
 
     if (await this.links.findByAlias(alias)) {
       throw new Error("ALIAS_TAKEN");
@@ -27,34 +40,97 @@ export class LinkService {
       id: crypto.randomUUID(),
       alias,
       destinationUrl,
-      title: parsed.title ?? "",
+      destinationDomain,
+      title: parsed.title ?? undefined,
       tags: parsed.tags ?? [],
       expiresAt: parsed.expiresAt ?? null,
       redirectCode: parsed.redirectCode ?? 302,
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+      passwordUpdatedAt: password.updatedAt,
+      clickLimit: parsed.clickLimit ?? null,
+      inactiveExpiresAfterMinutes: parsed.inactiveExpiresAfterMinutes ?? null,
+      countryAllowlist: normalizeCountryCodes(parsed.countryAllowlist),
+      countryBlocklist: normalizeCountryCodes(parsed.countryBlocklist),
+      favorite: parsed.favorite ?? false,
+      pinned: parsed.pinned ?? false,
+      safetyStatus: safety.status,
+      safetyReason: safety.reason,
       now
     });
 
-    await this.cache.put(toCacheEntry(link));
+    if (shouldCache(link)) {
+      await this.cache.put(toCacheEntry(link));
+    } else {
+      await this.cache.delete(link.alias);
+    }
+
     await this.auditLogs.insert({
       id: crypto.randomUUID(),
       actorUserId: owner.id,
       action: "link.create",
       entityType: "link",
       entityId: link.id,
-      severity: "info",
-      metadata: { alias: link.alias },
+      severity: safety.status === "suspect" ? "warning" : "info",
+      metadata: {
+        alias: link.alias,
+        destinationDomain: link.destinationDomain,
+        passwordProtected: link.passwordProtected,
+        safetyStatus: link.safetyStatus
+      },
       occurredAt: now
     });
 
     return link;
   }
 
-  listForUser(owner: User): Promise<LinkSummary[]> {
-    return this.links.listByOwner(owner.id);
+  listForUser(owner: User, filters?: LinkListFilters): Promise<LinkSummary[]> {
+    return this.links.listByOwner(owner.id, filters);
   }
 
-  listAll(): Promise<LinkSummary[]> {
-    return this.links.listAll();
+  listAll(filters?: LinkListFilters): Promise<LinkSummary[]> {
+    return this.links.listAll(filters);
+  }
+
+  async bulkAction(actor: User, input: LinkBulkActionInput, adminMode = false): Promise<{ affected: number }> {
+    const parsed = input;
+    const now = new Date().toISOString();
+    const ownerId = adminMode ? null : actor.id;
+
+    if (parsed.action === "delete") {
+      const affected = await this.links.bulkDelete(parsed.ids, ownerId);
+      await this.auditLogs.insert({
+        id: crypto.randomUUID(),
+        actorUserId: actor.id,
+        action: "link.bulk_delete",
+        entityType: "link",
+        entityId: null,
+        severity: adminMode ? "warning" : "info",
+        metadata: { ids: parsed.ids.length, adminMode },
+        occurredAt: now
+      });
+      return { affected };
+    }
+
+    const status = parsed.action === "activate" ? "active" : "disabled";
+    const affected = await this.links.bulkUpdateStatus(parsed.ids, status, ownerId, now);
+    await this.auditLogs.insert({
+      id: crypto.randomUUID(),
+      actorUserId: actor.id,
+      action: "link.bulk_status",
+      entityType: "link",
+      entityId: null,
+      severity: adminMode ? "warning" : "info",
+      metadata: { ids: parsed.ids.length, status, adminMode },
+      occurredAt: now
+    });
+    return { affected };
+  }
+
+  async exportSelected(actor: User, input: LinkExportInput, adminMode = false): Promise<LinkSummary[]> {
+    const links = await this.links.findManyByIds(input.ids);
+    return adminMode ? links : links.filter((link) => link.ownerId === actor.id);
   }
 
   async update(actor: User, id: string, input: UpdateLinkInput, adminMode = false): Promise<Link> {
@@ -68,13 +144,35 @@ export class LinkService {
     }
 
     const destinationUrl = parsed.destinationUrl ? await this.urlPolicy.validate(parsed.destinationUrl) : undefined;
-    const link = await this.links.update(id, ownerId, { ...parsed, destinationUrl }, now);
+    const destinationDomain = destinationUrl ? extractDestinationDomain(destinationUrl) : undefined;
+    const safety = destinationUrl ? analyzeDestinationSafety(destinationUrl) : { status: current.safetyStatus, reason: current.safetyReason };
+    const password = await this.updatePasswordState(parsed.password);
+
+    const link = await this.links.update(
+      id,
+      ownerId,
+      {
+        ...parsed,
+        destinationUrl,
+        destinationDomain,
+        tags: parsed.tags,
+        passwordHash: password.hash,
+        passwordSalt: password.salt,
+        passwordIterations: password.iterations,
+        passwordUpdatedAt: password.updatedAt,
+        countryAllowlist: parsed.countryAllowlist === undefined ? undefined : normalizeCountryCodes(parsed.countryAllowlist),
+        countryBlocklist: parsed.countryBlocklist === undefined ? undefined : normalizeCountryCodes(parsed.countryBlocklist),
+        safetyStatus: safety.status,
+        safetyReason: safety.reason
+      },
+      now
+    );
 
     if (!link) {
       throw new Error("LINK_NOT_FOUND");
     }
 
-    if (link.status === "active") {
+    if (shouldCache(link)) {
       await this.cache.put(toCacheEntry(link));
     } else {
       await this.cache.delete(link.alias);
@@ -86,8 +184,13 @@ export class LinkService {
       action: "link.update",
       entityType: "link",
       entityId: link.id,
-      severity: adminMode ? "warning" : "info",
-      metadata: { alias: link.alias, adminMode },
+      severity: adminMode || safety.status === "suspect" ? "warning" : "info",
+      metadata: {
+        alias: link.alias,
+        adminMode,
+        passwordProtected: link.passwordProtected,
+        safetyStatus: link.safetyStatus
+      },
       occurredAt: now
     });
 
@@ -118,9 +221,68 @@ export class LinkService {
       occurredAt: new Date().toISOString()
     });
   }
+
+  private async createPasswordState(password: string | null | undefined): Promise<{
+    hash: string | null;
+    salt: string | null;
+    iterations: number | null;
+    updatedAt: string | null;
+  }> {
+    if (!password) {
+      return { hash: null, salt: null, iterations: null, updatedAt: null };
+    }
+
+    const now = new Date().toISOString();
+    const hashed = await hashPassword(password);
+    return {
+      hash: hashed.hash,
+      salt: hashed.salt,
+      iterations: hashed.iterations,
+      updatedAt: now
+    };
+  }
+
+  private async updatePasswordState(password: string | null | undefined): Promise<{
+    hash?: string | null;
+    salt?: string | null;
+    iterations?: number | null;
+    updatedAt?: string | null;
+  }> {
+    if (password === undefined) {
+      return {};
+    }
+
+    if (password === null) {
+      return {
+        hash: null,
+        salt: null,
+        iterations: null,
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    const hashed = await hashPassword(password);
+    return {
+      hash: hashed.hash,
+      salt: hashed.salt,
+      iterations: hashed.iterations,
+      updatedAt: new Date().toISOString()
+    };
+  }
 }
 
-function toCacheEntry(link: Link): RedirectCacheEntry {
+function shouldCache(link: Link): boolean {
+  return (
+    link.status === "active" &&
+    !link.passwordProtected &&
+    link.clickLimit === null &&
+    link.inactiveExpiresAfterMinutes === null &&
+    link.countryAllowlist.length === 0 &&
+    link.countryBlocklist.length === 0
+  );
+}
+
+function toCacheEntry(link: Link): { id: string; alias: string; destinationUrl: string; status: Link["status"]; expiresAt: string | null; redirectCode: 301 | 302 } {
   return {
     id: link.id,
     alias: link.alias,

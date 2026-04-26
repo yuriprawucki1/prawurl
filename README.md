@@ -82,6 +82,7 @@ npx wrangler secret put GOOGLE_CLIENT_ID --config wrangler.api.jsonc
 npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.api.jsonc
 npx wrangler secret put GITHUB_CLIENT_ID --config wrangler.api.jsonc
 npx wrangler secret put GITHUB_CLIENT_SECRET --config wrangler.api.jsonc
+npx wrangler secret put SESSION_SECRET --config wrangler.redirect.jsonc
 npx wrangler secret put LOG_HASH_SALT --config wrangler.redirect.jsonc
 ```
 
@@ -143,6 +144,7 @@ STAGING_GOOGLE_CLIENT_ID
 STAGING_GOOGLE_CLIENT_SECRET
 STAGING_OAUTH_GITHUB_CLIENT_ID
 STAGING_OAUTH_GITHUB_CLIENT_SECRET
+STAGING_SESSION_SECRET
 STAGING_LOG_HASH_SALT
 ```
 
@@ -194,6 +196,7 @@ Use these callback URLs in the OAuth providers:
   - Create or open a GitHub OAuth App.
   - Set the callback URL to the GitHub callback above.
   - Copy the client ID and client secret.
+- `STAGING_SESSION_SECRET` is also written to the staging redirect worker so unlock cookies can be verified there.
 
 ### GitHub Actions secrets to add
 
@@ -205,6 +208,7 @@ Create these in the repository settings under Secrets and variables > Actions:
 - `STAGING_GOOGLE_CLIENT_SECRET`
 - `STAGING_OAUTH_GITHUB_CLIENT_ID`
 - `STAGING_OAUTH_GITHUB_CLIENT_SECRET`
+- `STAGING_SESSION_SECRET`
 - `STAGING_LOG_HASH_SALT`
 
 ### Reminder

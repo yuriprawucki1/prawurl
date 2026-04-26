@@ -64,9 +64,10 @@ jobs:
 
       - name: Atualizar secrets do Redirect Worker
         env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           LOG_HASH_SALT: ${{ secrets.LOG_HASH_SALT }}
         run: |
-          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-secrets.json', JSON.stringify({ LOG_HASH_SALT: process.env.LOG_HASH_SALT || '' }));"
+          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-secrets.json', JSON.stringify({ SESSION_SECRET: process.env.SESSION_SECRET || '', LOG_HASH_SALT: process.env.LOG_HASH_SALT || '' }));"
           npx wrangler secret bulk /tmp/prawurl-redirect-secrets.json --config wrangler.redirect.jsonc
 
       - name: Publicar Pages

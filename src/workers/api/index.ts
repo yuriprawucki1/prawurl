@@ -1,4 +1,5 @@
 import { LinkService } from "../../application/link-service";
+import { RedirectService } from "../../application/redirect-service";
 import { AdminPolicy } from "../../domain/admin-policy";
 import { AliasPolicy } from "../../domain/alias-policy";
 import { UrlPolicy } from "../../domain/url-policy";
@@ -15,8 +16,19 @@ import {
 import { sha256Hex, randomToken } from "../../infrastructure/crypto";
 import { KvRedirectCache } from "../../infrastructure/kv-redirect-cache";
 import { authorizationUrl, exchangeOAuthCode } from "../../infrastructure/oauth";
-import type { AppEvent, OAuthProvider, UserStatus, UserRole } from "../../shared/contracts";
-import { isReservedPath, normalizeAlias } from "../../shared/validation";
+import { buildUnlockCookieName } from "../../infrastructure/link-security";
+import type {
+  AppEvent,
+  BlockedDomainEntry,
+  LinkBulkActionInput,
+  LinkExportInput,
+  LinkListFilters,
+  OAuthProvider,
+  SessionUser,
+  UserRole,
+  UserStatus
+} from "../../shared/contracts";
+import { blockedDomainInputSchema, bulkLinkActionSchema, exportLinkSchema, isReservedPath, normalizeAlias } from "../../shared/validation";
 import { ZodError } from "zod";
 
 interface Env {
@@ -87,41 +99,51 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     return json({ ok: true, service: "prawurl-api", checkedAt: new Date().toISOString() });
   }
 
+  const now = new Date().toISOString();
   const publicResolve = path.match(/^public\/resolve\/(.+)$/);
   if (publicResolve && request.method === "GET") {
     const alias = normalizeAlias(decodeURIComponent(publicResolve[1]).replace(/^\/+|\/+$/g, ""));
-    if (isReservedPath(alias)) {
-      return json({ error: "NOT_FOUND" }, 404);
+    return json(
+      await resolvePublicAlias(request, env, services.redirectService, alias, now)
+    );
+  }
+
+  const publicUnlock = path.match(/^public\/resolve\/(.+)\/unlock$/);
+  if (publicUnlock && request.method === "POST") {
+    const alias = normalizeAlias(decodeURIComponent(publicUnlock[1]).replace(/^\/+|\/+$/g, ""));
+    const body = (await request.json()) as { password?: string };
+    if (!body.password) {
+      throw new Error("PASSWORD_REQUIRED");
     }
 
-    const link = await services.links.findByAlias(alias);
-    if (!link || link.status !== "active" || (link.expiresAt && Date.parse(link.expiresAt) <= Date.now())) {
-      return json({ error: "NOT_FOUND" }, 404);
+    const result = await services.redirectService.unlock(alias, body.password, publicContext(request, now));
+    if (result.kind === "redirect") {
+      ctx.waitUntil(
+        insertClickEvent(env.DB, {
+          linkId: result.linkId ?? null,
+          alias: result.alias ?? alias,
+          occurredAt: now,
+          country: request.cf?.country?.toString() ?? null,
+          region: request.cf?.region?.toString() ?? null,
+          referrer: request.headers.get("referer"),
+          userAgent: summarizeUserAgent(request.headers.get("user-agent")),
+          ipHash: null
+        })
+      );
     }
 
-    ctx.waitUntil(insertClickEvent(env.DB, {
-      linkId: link.id,
-      alias: link.alias,
-      occurredAt: new Date().toISOString(),
-      country: request.cf?.country?.toString() ?? null,
-      region: request.cf?.region?.toString() ?? null,
-      referrer: request.headers.get("referer"),
-      userAgent: summarizeUserAgent(request.headers.get("user-agent")),
-      ipHash: null
-    }));
-
-    return json({ destinationUrl: link.destinationUrl });
+    return json(result, 200, result.setCookie ? { "set-cookie": result.setCookie } : undefined);
   }
 
   if (path === "auth/session") {
-    const session = await readSession(request, env);
+    const session = await readSession(request, env, services);
     return json({ session });
   }
 
   if (path === "auth/logout" && request.method === "POST") {
     const token = cookieValue(request, env.SESSION_COOKIE_NAME);
     if (token) {
-      await services.sessions.revoke(await sha256Hex(`${env.SESSION_SECRET}:${token}`), new Date().toISOString());
+      await services.sessions.revoke(await sha256Hex(`${env.SESSION_SECRET}:${token}`), now);
     }
     return json({ ok: true }, 200, clearSessionCookie(env));
   }
@@ -152,12 +174,12 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
       name: profile.name,
       avatarUrl: profile.avatarUrl,
       bootstrapAdminEmail: env.BOOTSTRAP_ADMIN_EMAIL || null,
-      now: new Date().toISOString()
+      now
     });
 
     const token = randomToken();
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
-    await services.sessions.create(user.id, await sha256Hex(`${env.SESSION_SECRET}:${token}`), expiresAt, new Date().toISOString());
+    await services.sessions.create(user.id, await sha256Hex(`${env.SESSION_SECRET}:${token}`), expiresAt, now);
     await services.auditLogs.insert({
       id: crypto.randomUUID(),
       actorUserId: user.id,
@@ -166,22 +188,33 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
       entityId: user.id,
       severity: "info",
       metadata: { provider },
-      occurredAt: new Date().toISOString()
+      occurredAt: now
     });
 
     return redirect(`${env.APP_ORIGIN}/app`, 302, sessionCookie(token, env));
   }
 
-  const session = await requireSession(request, env);
+  const session = await requireSession(request, env, services);
   services.adminPolicy.assertActive(session.user);
 
   if (path === "links" && request.method === "GET") {
-    return json({ links: await services.linkService.listForUser(session.user) });
+    return json({ links: await services.linkService.listForUser(session.user, readLinkFilters(url)) });
   }
 
   if (path === "links" && request.method === "POST") {
     const link = await services.linkService.create(session.user, await request.json());
     return json({ link }, 201);
+  }
+
+  if (path === "links/bulk" && request.method === "POST") {
+    const body = bulkLinkActionSchema.parse(await request.json()) satisfies LinkBulkActionInput;
+    return json({ result: await services.linkService.bulkAction(session.user, body) });
+  }
+
+  if (path === "links/export" && request.method === "POST") {
+    const body = exportLinkSchema.parse(await request.json()) satisfies LinkExportInput;
+    const links = await services.linkService.exportSelected(session.user, body);
+    return csvResponse(renderLinksCsv(links));
   }
 
   const linkMatch = path.match(/^links\/([^/]+)$/);
@@ -208,13 +241,19 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
       entityId: null,
       severity: "warning",
       metadata: { path, method: request.method },
-      occurredAt: new Date().toISOString()
+      occurredAt: now
     })
   );
   return json({ error: "NOT_FOUND" }, 404);
 }
 
 async function handleAdmin(path: string, request: Request, services: ReturnType<typeof makeServices>, actorUserId: string): Promise<Response> {
+  const now = new Date().toISOString();
+  const actor = await services.users.findById(actorUserId);
+  if (!actor) {
+    throw new Error("UNAUTHENTICATED");
+  }
+
   if (path === "admin/summary" && request.method === "GET") {
     return json({ summary: await services.metrics.summary() });
   }
@@ -223,13 +262,28 @@ async function handleAdmin(path: string, request: Request, services: ReturnType<
     return json({ users: await services.users.listAll() });
   }
 
+  if (path === "admin/links" && request.method === "GET") {
+    return json({ links: await services.linkService.listAll(readLinkFilters(new URL(request.url))) });
+  }
+
+  if (path === "admin/links/bulk" && request.method === "POST") {
+    const body = bulkLinkActionSchema.parse(await request.json()) satisfies LinkBulkActionInput;
+    return json({ result: await services.linkService.bulkAction(actor, body, true) });
+  }
+
+  if (path === "admin/links/export" && request.method === "POST") {
+    const body = exportLinkSchema.parse(await request.json()) satisfies LinkExportInput;
+    const links = await services.linkService.exportSelected(actor, body, true);
+    return csvResponse(renderLinksCsv(links));
+  }
+
   const userStatus = path.match(/^admin\/users\/([^/]+)\/status$/);
   if (userStatus && request.method === "PATCH") {
     const body = (await request.json()) as { status?: UserStatus };
     if (body.status !== "active" && body.status !== "blocked") {
       throw new Error("INVALID_STATUS");
     }
-    const user = await services.users.updateStatus(userStatus[1], body.status, new Date().toISOString());
+    const user = await services.users.updateStatus(userStatus[1], body.status, now);
     await services.auditLogs.insert({
       id: crypto.randomUUID(),
       actorUserId,
@@ -238,7 +292,7 @@ async function handleAdmin(path: string, request: Request, services: ReturnType<
       entityId: userStatus[1],
       severity: "warning",
       metadata: { status: body.status },
-      occurredAt: new Date().toISOString()
+      occurredAt: now
     });
     return json({ user });
   }
@@ -249,7 +303,7 @@ async function handleAdmin(path: string, request: Request, services: ReturnType<
     if (body.role !== "user" && body.role !== "admin") {
       throw new Error("INVALID_ROLE");
     }
-    const user = await services.users.updateRole(userRole[1], body.role, new Date().toISOString());
+    const user = await services.users.updateRole(userRole[1], body.role, now);
     await services.auditLogs.insert({
       id: crypto.randomUUID(),
       actorUserId,
@@ -258,17 +312,58 @@ async function handleAdmin(path: string, request: Request, services: ReturnType<
       entityId: userRole[1],
       severity: "critical",
       metadata: { role: body.role },
-      occurredAt: new Date().toISOString()
+      occurredAt: now
     });
     return json({ user });
   }
 
-  if (path === "admin/links" && request.method === "GET") {
-    return json({ links: await services.linkService.listAll() });
-  }
-
   if (path === "admin/audit-logs" && request.method === "GET") {
     return json({ logs: await services.auditLogs.listRecent(200) });
+  }
+
+  if (path === "admin/blocked-domains" && request.method === "GET") {
+    return json({ domains: await services.blockedDomains.list() });
+  }
+
+  if (path === "admin/blocked-domains" && request.method === "POST") {
+    const body = blockedDomainInputSchema.parse(await request.json());
+    const entry: BlockedDomainEntry = {
+      domain: body.domain,
+      reason: body.reason,
+      createdAt: now
+    };
+    await services.blockedDomains.add(entry);
+    await services.auditLogs.insert({
+      id: crypto.randomUUID(),
+      actorUserId,
+      action: "admin.blocked_domain.add",
+      entityType: "blocked_domain",
+      entityId: entry.domain,
+      severity: "critical",
+      metadata: { reason: entry.reason },
+      occurredAt: now
+    });
+    return json({ domain: entry }, 201);
+  }
+
+  const blockedDomain = path.match(/^admin\/blocked-domains\/(.+)$/);
+  if (blockedDomain && request.method === "DELETE") {
+    const domain = decodeURIComponent(blockedDomain[1]);
+    const removed = await services.blockedDomains.remove(domain);
+    if (!removed) {
+      return json({ error: "NOT_FOUND" }, 404);
+    }
+    await services.auditLogs.insert({
+      id: crypto.randomUUID(),
+      actorUserId,
+      action: "admin.blocked_domain.remove",
+      entityType: "blocked_domain",
+      entityId: domain,
+      severity: "warning",
+      metadata: {},
+      occurredAt: now
+    });
+    return json({ ok: true });
   }
 
   return json({ error: "NOT_FOUND" }, 404);
@@ -283,6 +378,7 @@ function makeServices(env: Env) {
   const blockedDomains = new D1BlockedDomainRepository(env.DB);
   const cache = new KvRedirectCache(env.PRAWURL_LINKS);
   const linkService = new LinkService(links, cache, new AliasPolicy(aliases), new UrlPolicy(blockedDomains), auditLogs);
+  const redirectService = new RedirectService(links, cache, env.SESSION_SECRET, cookieDomainFromOrigin(env.PUBLIC_ORIGIN));
 
   return {
     users,
@@ -290,25 +386,170 @@ function makeServices(env: Env) {
     sessions,
     auditLogs,
     metrics: new D1MetricsRepository(env.DB),
+    blockedDomains,
     linkService,
+    redirectService,
     adminPolicy: new AdminPolicy()
   };
 }
 
-async function readSession(request: Request, env: Env) {
+async function resolvePublicAlias(request: Request, env: Env, redirectService: RedirectService, alias: string, now: string) {
+  const unlockToken = cookieValue(request, buildUnlockCookieName(alias));
+  const result = await redirectService.resolve(alias, publicContext(request, now, unlockToken));
+  return publicResolution(result);
+}
+
+async function readSession(request: Request, env: Env, services: ReturnType<typeof makeServices>): Promise<SessionUser | null> {
   const token = cookieValue(request, env.SESSION_COOKIE_NAME);
   if (!token) {
     return null;
   }
-  return new D1SessionRepository(env.DB).findByTokenHash(await sha256Hex(`${env.SESSION_SECRET}:${token}`), new Date().toISOString());
+
+  return services.sessions.findByTokenHash(await sha256Hex(`${env.SESSION_SECRET}:${token}`), new Date().toISOString());
 }
 
-async function requireSession(request: Request, env: Env) {
-  const session = await readSession(request, env);
+async function requireSession(request: Request, env: Env, services: ReturnType<typeof makeServices>): Promise<SessionUser> {
+  const session = await readSession(request, env, services);
   if (!session) {
     throw new Error("UNAUTHENTICATED");
   }
   return session;
+}
+
+function publicContext(request: Request, now: string, unlockToken: string | null = null) {
+  return {
+    country: request.cf?.country?.toString() ?? null,
+    unlockToken,
+    now
+  };
+}
+
+function cookieDomainFromOrigin(origin: string): string | null {
+  const hostname = new URL(origin).hostname;
+  if (hostname === "localhost" || /^[\d.]+$/.test(hostname)) {
+    return null;
+  }
+
+  const parts = hostname.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  return `.${parts.slice(-2).join(".")}`;
+}
+
+function publicResolution(result: Awaited<ReturnType<RedirectService["resolve"]>>) {
+  if (result.kind === "redirect") {
+    return {
+      kind: "redirect" as const,
+      destinationUrl: result.destinationUrl,
+      redirectCode: result.redirectCode,
+      alias: result.alias
+    };
+  }
+
+  if (result.kind === "password_required") {
+    return {
+      kind: "password_required" as const,
+      alias: result.alias,
+      message: result.message ?? "Senha obrigatória."
+    };
+  }
+
+  if (result.kind === "blocked") {
+    return {
+      kind: "blocked" as const,
+      alias: result.alias,
+      message: result.message ?? "Esse link não está disponível."
+    };
+  }
+
+  return {
+    kind: "not_found" as const,
+    alias: result.alias
+  };
+}
+
+function readLinkFilters(url: URL): LinkListFilters {
+  return {
+    status: parseStatus(url.searchParams.get("status")),
+    search: url.searchParams.get("search") ?? undefined,
+    domain: url.searchParams.get("domain") ?? undefined,
+    tag: url.searchParams.get("tag") ?? undefined,
+    createdFrom: url.searchParams.get("from") ?? undefined,
+    createdTo: url.searchParams.get("to") ?? undefined,
+    favorite: parseBoolean(url.searchParams.get("favorite")),
+    pinned: parseBoolean(url.searchParams.get("pinned"))
+  };
+}
+
+function parseStatus(value: string | null): LinkListFilters["status"] {
+  if (value === "active" || value === "disabled" || value === "blocked") {
+    return value;
+  }
+  return undefined;
+}
+
+function parseBoolean(value: string | null): boolean | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  if (["1", "true", "yes"].includes(value.toLowerCase())) {
+    return true;
+  }
+  if (["0", "false", "no"].includes(value.toLowerCase())) {
+    return false;
+  }
+  return undefined;
+}
+
+function renderLinksCsv(links: Awaited<ReturnType<LinkService["exportSelected"]>>): string {
+  const header = [
+    "id",
+    "alias",
+    "destinationUrl",
+    "destinationDomain",
+    "title",
+    "status",
+    "clickCount",
+    "favorite",
+    "pinned",
+    "tags",
+    "createdAt",
+    "updatedAt"
+  ];
+
+  const rows = links.map((link) => [
+    link.id,
+    link.alias,
+    link.destinationUrl,
+    link.destinationDomain,
+    link.title ?? "",
+    link.status,
+    String(link.clickCount),
+    String(link.favorite),
+    String(link.pinned),
+    link.tags.join("|"),
+    link.createdAt,
+    link.updatedAt
+  ]);
+
+  return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
+function csvCell(value: string): string {
+  const escaped = value.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+function csvResponse(csv: string): Response {
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="prawurl-links-${new Date().toISOString().slice(0, 10)}.csv"`
+    }
+  });
 }
 
 function oauthConfig(env: Env, request: Request) {
