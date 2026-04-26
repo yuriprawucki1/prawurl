@@ -3,6 +3,7 @@ export type UserStatus = "active" | "blocked";
 export type LinkStatus = "active" | "disabled" | "blocked";
 export type OAuthProvider = "google" | "github";
 export type AuditSeverity = "info" | "warning" | "critical";
+export type LinkSafetyStatus = "clean" | "suspect" | "blocked";
 
 export interface User {
   id: string;
@@ -20,11 +21,24 @@ export interface Link {
   ownerId: string;
   alias: string;
   destinationUrl: string;
+  destinationDomain: string;
   title: string | null;
   tags: string[];
   status: LinkStatus;
   expiresAt: string | null;
   redirectCode: 301 | 302;
+  passwordProtected: boolean;
+  passwordUpdatedAt: string | null;
+  clickCount: number;
+  clickLimit: number | null;
+  inactiveExpiresAfterMinutes: number | null;
+  lastClickedAt: string | null;
+  countryAllowlist: string[];
+  countryBlocklist: string[];
+  favorite: boolean;
+  pinned: boolean;
+  safetyStatus: LinkSafetyStatus;
+  safetyReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,14 +55,29 @@ export interface CreateLinkInput {
   tags?: string[];
   expiresAt?: string | null;
   redirectCode?: 301 | 302;
+  password?: string | null;
+  clickLimit?: number | null;
+  inactiveExpiresAfterMinutes?: number | null;
+  countryAllowlist?: string[];
+  countryBlocklist?: string[];
+  favorite?: boolean;
+  pinned?: boolean;
 }
 
 export interface UpdateLinkInput {
   destinationUrl?: string;
   title?: string | null;
+  tags?: string[];
   status?: LinkStatus;
   expiresAt?: string | null;
   redirectCode?: 301 | 302;
+  password?: string | null;
+  clickLimit?: number | null;
+  inactiveExpiresAfterMinutes?: number | null;
+  countryAllowlist?: string[];
+  countryBlocklist?: string[];
+  favorite?: boolean;
+  pinned?: boolean;
 }
 
 export interface SessionUser {
@@ -83,6 +112,44 @@ export interface RedirectCacheEntry {
   status: LinkStatus;
   expiresAt: string | null;
   redirectCode: 301 | 302;
+}
+
+export interface LinkListFilters {
+  status?: LinkStatus;
+  search?: string;
+  domain?: string;
+  tag?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  favorite?: boolean;
+  pinned?: boolean;
+}
+
+export interface BlockedDomainEntry {
+  domain: string;
+  reason: string;
+  createdAt: string;
+}
+
+export interface PublicLinkResolution {
+  kind: "redirect" | "password_required" | "blocked" | "not_found";
+  alias?: string;
+  linkId?: string;
+  title?: string | null;
+  destinationUrl?: string;
+  redirectCode?: 301 | 302;
+  message?: string;
+  safetyStatus?: LinkSafetyStatus;
+  safetyReason?: string | null;
+}
+
+export interface LinkBulkActionInput {
+  ids: string[];
+  action: "activate" | "deactivate" | "delete";
+}
+
+export interface LinkExportInput {
+  ids: string[];
 }
 
 export type AppEvent =

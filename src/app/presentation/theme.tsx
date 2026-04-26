@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import type { ButtonHTMLAttributes } from "react";
 import { Button } from "../components/ui/button";
@@ -7,6 +7,7 @@ import { getCookieDomain } from "../lib/origins";
 export type Theme = "light" | "dark";
 
 const themeCookieName = "prawurl_theme";
+const themeHostCookieName = "prawurl_theme_host";
 const themeStorageKey = "prawurl-theme";
 
 export function useTheme(publicOrigin: string) {
@@ -15,22 +16,39 @@ export function useTheme(publicOrigin: string) {
       return "light";
     }
 
-    const cookieTheme = readCookie(themeCookieName);
+    const cookieTheme = readCookie(themeHostCookieName) ?? readCookie(themeCookieName);
     if (cookieTheme === "light" || cookieTheme === "dark") {
       return cookieTheme;
     }
 
-    const stored = window.localStorage.getItem(themeStorageKey);
-    if (stored === "light" || stored === "dark") {
-      return stored;
+    try {
+      const stored = window.localStorage.getItem(themeStorageKey);
+      if (stored === "light" || stored === "dark") {
+        return stored;
+      }
+    } catch {
+      // Ignore storage access failures and fall back below.
+    }
+
+    if (document.documentElement.classList.contains("dark")) {
+      return "dark";
     }
 
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem(themeStorageKey, theme);
+    document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(themeStorageKey, theme);
+    } catch {
+      // Ignore storage access failures and continue writing the cookie.
+    }
     writeThemeCookie(theme, publicOrigin);
   }, [publicOrigin, theme]);
 
@@ -62,5 +80,6 @@ function readCookie(name: string): string | null {
 
 function writeThemeCookie(theme: Theme, publicOrigin: string): void {
   const domain = getCookieDomain(publicOrigin);
+  document.cookie = `${themeHostCookieName}=${theme}; path=/; max-age=31536000; SameSite=Lax`;
   document.cookie = `${themeCookieName}=${theme}; path=/; max-age=31536000; SameSite=Lax${domain}`;
 }

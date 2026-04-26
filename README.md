@@ -22,6 +22,8 @@ Created in the connected account:
 
 ## Local Development
 
+Project conventions and UI quality notes live in [`docs/napkin.md`](docs/napkin.md).
+
 ```bash
 npm install
 cp .dev.vars.example .dev.vars
@@ -53,6 +55,13 @@ http://localhost:5173/app
 
 Mock mode uses a fake admin session and sample links, users, metrics and audit logs. It is intended for UI development only.
 
+For visual layout checks across desktop and mobile, install the Playwright browser once and run the visual suite:
+
+```bash
+npm run playwright:install
+npm run test:visual
+```
+
 By default the frontend calls the production API at `https://api.prawurl.com`. To point the frontend to a local API Worker, create `.env.local`:
 
 ```bash
@@ -82,6 +91,7 @@ npx wrangler secret put GOOGLE_CLIENT_ID --config wrangler.api.jsonc
 npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.api.jsonc
 npx wrangler secret put GITHUB_CLIENT_ID --config wrangler.api.jsonc
 npx wrangler secret put GITHUB_CLIENT_SECRET --config wrangler.api.jsonc
+npx wrangler secret put SESSION_SECRET --config wrangler.redirect.jsonc
 npx wrangler secret put LOG_HASH_SALT --config wrangler.redirect.jsonc
 ```
 
@@ -143,6 +153,7 @@ STAGING_GOOGLE_CLIENT_ID
 STAGING_GOOGLE_CLIENT_SECRET
 STAGING_OAUTH_GITHUB_CLIENT_ID
 STAGING_OAUTH_GITHUB_CLIENT_SECRET
+STAGING_SESSION_SECRET
 STAGING_LOG_HASH_SALT
 ```
 
@@ -194,6 +205,7 @@ Use these callback URLs in the OAuth providers:
   - Create or open a GitHub OAuth App.
   - Set the callback URL to the GitHub callback above.
   - Copy the client ID and client secret.
+- `STAGING_SESSION_SECRET` is also written to the staging redirect worker so unlock cookies can be verified there.
 
 ### GitHub Actions secrets to add
 
@@ -205,6 +217,7 @@ Create these in the repository settings under Secrets and variables > Actions:
 - `STAGING_GOOGLE_CLIENT_SECRET`
 - `STAGING_OAUTH_GITHUB_CLIENT_ID`
 - `STAGING_OAUTH_GITHUB_CLIENT_SECRET`
+- `STAGING_SESSION_SECRET`
 - `STAGING_LOG_HASH_SALT`
 
 ### Reminder

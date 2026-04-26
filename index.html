@@ -6,6 +6,24 @@
     <meta name="format-detection" content="telephone=no,email=no,address=no" />
     <meta name="description" content="PrawURL encurta, organiza e audita links com velocidade de edge." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (() => {
+        try {
+          const key = "prawurl-theme";
+          const hostCookie = document.cookie.split("; ").find((item) => item.startsWith("prawurl_theme_host="));
+          const domainCookie = document.cookie.split("; ").find((item) => item.startsWith("prawurl_theme="));
+          let theme = hostCookie ? hostCookie.split("=")[1] : domainCookie ? domainCookie.split("=")[1] : window.localStorage.getItem(key);
+          if (theme !== "light" && theme !== "dark") {
+            theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.classList.toggle("dark", theme === "dark");
+          document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+          document.documentElement.dataset.theme = theme;
+        } catch {
+          document.documentElement.classList.remove("dark");
+        }
+      })();
+    </script>
     <title>PrawURL</title>
   </head>
   <body>

@@ -8,6 +8,18 @@ class MemoryBlockedDomains implements BlockedDomainRepository {
   async isBlocked(hostname: string): Promise<boolean> {
     return this.values.includes(hostname);
   }
+
+  async list(): Promise<never[]> {
+    return [];
+  }
+
+  async add(): Promise<void> {
+    return;
+  }
+
+  async remove(): Promise<boolean> {
+    return false;
+  }
 }
 
 describe("UrlPolicy", () => {

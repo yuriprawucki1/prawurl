@@ -2,6 +2,7 @@ import { RedirectService } from "../../application/redirect-service";
 import { D1LinkRepository, insertClickEvent } from "../../infrastructure/d1-repositories";
 import { sha256Hex } from "../../infrastructure/crypto";
 import { KvRedirectCache } from "../../infrastructure/kv-redirect-cache";
+import { buildUnlockCookieName } from "../../infrastructure/link-security";
 import type { AppEvent } from "../../shared/contracts";
 import { isReservedPath, normalizeAlias } from "../../shared/validation";
 
@@ -11,6 +12,7 @@ interface Env {
   EVENTS: Queue<AppEvent>;
   ASSETS: Fetcher;
   PUBLIC_ORIGIN: string;
+  SESSION_SECRET: string;
   LOG_HASH_SALT?: string;
 }
 
@@ -27,22 +29,24 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    const service = new RedirectService(
-      new D1LinkRepository(env.DB),
-      new KvRedirectCache(env.PRAWURL_LINKS)
-    );
-    const entry = await service.resolve(alias);
+    const service = new RedirectService(new D1LinkRepository(env.DB), new KvRedirectCache(env.PRAWURL_LINKS), env.SESSION_SECRET, cookieDomainFromOrigin(env.PUBLIC_ORIGIN));
+    const unlockToken = cookieValue(request, buildUnlockCookieName(alias));
+    const result = await service.resolve(alias, {
+      country: request.cf?.country?.toString() ?? null,
+      unlockToken,
+      now: new Date().toISOString()
+    });
 
-    if (!entry) {
-      return env.ASSETS.fetch(new Request(new URL("/status?missing=1", url), request));
+    if (result.kind !== "redirect") {
+      return env.ASSETS.fetch(request);
     }
 
-    ctx.waitUntil(clickEvent(request, env, entry.id, entry.alias).then((event) => insertClickEvent(env.DB, event)));
+    ctx.waitUntil(clickEvent(request, env, result.linkId ?? null, result.alias ?? alias).then((event) => insertClickEvent(env.DB, event)));
 
     return new Response(null, {
-      status: entry.redirectCode,
+      status: result.redirectCode ?? 302,
       headers: {
-        location: entry.destinationUrl,
+        location: result.destinationUrl ?? "/",
         "cache-control": "no-store"
       }
     });
@@ -51,6 +55,20 @@ export default {
 
 function isAssetOrPublicPage(alias: string): boolean {
   return isReservedPath(alias) || alias.startsWith("assets/") || alias.includes(".");
+}
+
+function cookieDomainFromOrigin(origin: string): string | null {
+  const hostname = new URL(origin).hostname;
+  if (hostname === "localhost" || /^[\d.]+$/.test(hostname)) {
+    return null;
+  }
+
+  const parts = hostname.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  return `.${parts.slice(-2).join(".")}`;
 }
 
 function summarizeUserAgent(value: string | null): string | null {
@@ -68,7 +86,7 @@ async function ipHash(request: Request, env: Env): Promise<string | null> {
   return sha256Hex(`${env.LOG_HASH_SALT}:${ip}`);
 }
 
-async function clickEvent(request: Request, env: Env, linkId: string, alias: string): Promise<Extract<AppEvent, { type: "click" }>> {
+async function clickEvent(request: Request, env: Env, linkId: string | null, alias: string): Promise<Extract<AppEvent, { type: "click" }>> {
   return {
     type: "click",
     linkId,
@@ -80,4 +98,13 @@ async function clickEvent(request: Request, env: Env, linkId: string, alias: str
     userAgent: summarizeUserAgent(request.headers.get("user-agent")),
     ipHash: await ipHash(request, env)
   };
+}
+
+function cookieValue(request: Request, name: string): string | null {
+  const header = request.headers.get("cookie");
+  if (!header) {
+    return null;
+  }
+  const cookies = header.split(";").map((item) => item.trim().split("="));
+  return cookies.find(([key]) => key === name)?.[1] ?? null;
 }

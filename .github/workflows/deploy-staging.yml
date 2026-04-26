@@ -64,9 +64,10 @@ jobs:
 
       - name: Atualizar secrets do Redirect Worker staging
         env:
+          STAGING_SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
           STAGING_LOG_HASH_SALT: ${{ secrets.STAGING_LOG_HASH_SALT }}
         run: |
-          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-staging-secrets.json', JSON.stringify({ LOG_HASH_SALT: process.env.STAGING_LOG_HASH_SALT || '' }));"
+          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-staging-secrets.json', JSON.stringify({ SESSION_SECRET: process.env.STAGING_SESSION_SECRET || '', LOG_HASH_SALT: process.env.STAGING_LOG_HASH_SALT || '' }));"
           npx wrangler secret bulk /tmp/prawurl-redirect-staging-secrets.json --config wrangler.redirect.jsonc --env staging
 
       - name: Publicar Pages staging
