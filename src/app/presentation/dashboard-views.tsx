@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import QRCode from "qrcode";
 import {
+  CalendarDays,
   ArrowUpDown,
   Check,
   Copy,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
   Filter,
   LinkIcon,
   Lock,
@@ -14,7 +18,6 @@ import {
   QrCode,
   Plus,
   Shield,
-  Tags,
   Trash2,
   Star,
   StarOff,
@@ -40,12 +43,14 @@ import { resolveOrigins } from "../lib/origins";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { normalizeDestinationUrlInput } from "../../shared/validation";
 import { Badge } from "../components/ui/badge";
+import { Checkbox } from "../components/ui/checkbox";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -206,7 +211,7 @@ export function AuditLogsView() {
     <section className="grid min-w-0 gap-6 overflow-x-hidden">
       <PageTitle title="Auditoria" description="Eventos persistentes de autenticação, links, admin e segurança." />
       <Card className="min-w-0">
-        <CardContent className="pt-6">{loading ? <AuditLogsSkeleton /> : <AuditLogsList logs={logs} />}</CardContent>
+        <CardContent className="pt-6 overflow-hidden">{loading ? <AuditLogsSkeleton /> : <AuditLogsList logs={logs} />}</CardContent>
       </Card>
     </section>
   );
@@ -566,6 +571,7 @@ function LinkEditorDialog({
   const isMobile = useIsMobile();
   const [form, setForm] = useState<LinkFormState>(() => stateFromLink(null));
   const [formError, setFormError] = useState<string | null>(null);
+  const hasPassword = Boolean(initialLink?.passwordProtected);
 
   useEffect(() => {
     if (open) {
@@ -573,6 +579,17 @@ function LinkEditorDialog({
       setFormError(null);
     }
   }, [initialLink, open]);
+
+  useEffect(() => {
+    if (open && form.expiresPreset === "custom" && !form.expiresDate) {
+      const now = new Date();
+      setForm((current) => ({
+        ...current,
+        expiresDate: toDateInputValue(now),
+        expiresTime: toTimeInputValue(now)
+      }));
+    }
+  }, [form.expiresDate, form.expiresPreset, open]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -600,7 +617,13 @@ function LinkEditorDialog({
       <div className="grid gap-2 md:grid-cols-2">
         <div className="grid gap-2">
           <Label>Alias</Label>
-          <Input value={form.alias} onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))} placeholder="meu-link" />
+          <Input
+            value={form.alias}
+            onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
+            placeholder="Opcional"
+            disabled={mode === "edit"}
+          />
+          {mode === "edit" && <p className="text-xs text-muted-foreground">O alias fica travado na edição para evitar quebra de links existentes.</p>}
         </div>
         <div className="grid gap-2">
           <Label>Título</Label>
@@ -614,18 +637,40 @@ function LinkEditorDialog({
       <div className="grid gap-2 md:grid-cols-2">
         <div className="grid gap-2">
           <Label>Senha</Label>
-          <Input
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-            placeholder={mode === "edit" ? "Deixe em branco para manter" : "Opcional"}
-          />
-          {mode === "edit" && (
-            <label className="flex items-center gap-2 text-sm">
-              <input checked={form.clearPassword} onChange={(event) => setForm((current) => ({ ...current, clearPassword: event.target.checked }))} type="checkbox" />
-              Remover senha
-            </label>
-          )}
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+            <Input
+              type="password"
+              value={form.password}
+              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              placeholder={mode === "edit" ? "Deixe em branco para manter" : "Opcional"}
+            />
+            <div className="flex min-h-10 items-center gap-2">
+              {mode === "edit" ? (
+                hasPassword ? (
+                  <>
+                    <Badge className="gap-1 font-mono tracking-[0.2em]">
+                      <Lock className="h-3 w-3" />
+                      ••••••
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant={form.clearPassword ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={() => setForm((current) => ({ ...current, clearPassword: !current.clearPassword }))}
+                      className="shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {form.clearPassword ? "Senha será removida" : "Remover senha"}
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sem senha definida</span>
+                )
+              ) : (
+                <span className="text-xs text-muted-foreground">Opcional</span>
+              )}
+            </div>
+          </div>
         </div>
         <div className="grid gap-2">
           <Label>Redirect</Label>
@@ -666,10 +711,11 @@ function LinkEditorDialog({
         </div>
       </div>
       {form.expiresPreset === "custom" && (
-        <div className="grid gap-2">
-          <Label>Expira em</Label>
-          <Input type="datetime-local" value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} />
-        </div>
+        <DateTimePickerField
+          date={form.expiresDate}
+          time={form.expiresTime}
+          onChange={(date, time) => setForm((current) => ({ ...current, expiresDate: date, expiresTime: time }))}
+        />
       )}
       <div className="grid gap-2 md:grid-cols-2">
         <CountryMultiSelectField
@@ -687,11 +733,11 @@ function LinkEditorDialog({
       </div>
       <div className="flex flex-wrap gap-4">
         <label className="flex items-center gap-2 text-sm">
-          <input checked={form.favorite} onChange={(event) => setForm((current) => ({ ...current, favorite: event.target.checked }))} type="checkbox" />
+          <Checkbox checked={form.favorite} onCheckedChange={(checked) => setForm((current) => ({ ...current, favorite: checked }))} />
           Favorito
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input checked={form.pinned} onChange={(event) => setForm((current) => ({ ...current, pinned: event.target.checked }))} type="checkbox" />
+          <Checkbox checked={form.pinned} onCheckedChange={(checked) => setForm((current) => ({ ...current, pinned: checked }))} />
           Fixar no topo
         </label>
       </div>
@@ -734,6 +780,121 @@ function LinkEditorDialog({
   );
 }
 
+function DateTimePickerField({
+  date,
+  time,
+  onChange
+}: {
+  date: string;
+  time: string;
+  onChange: (date: string, time: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(date ? new Date(`${date}T${time || "12:00"}`) : new Date()));
+
+  useEffect(() => {
+    if (open) {
+      setViewMonth(startOfMonth(date ? new Date(`${date}T${time || "12:00"}`) : new Date()));
+    }
+  }, [date, open, time]);
+
+  const selectedLabel = date && time ? formatDateTimeLabel(date, time) : "Selecionar data e hora";
+  const days = useMemo(() => buildMonthDays(viewMonth), [viewMonth]);
+  const weekDays = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const selectedDate = date ? new Date(`${date}T${time || "12:00"}`) : null;
+
+  function selectDay(day: Date) {
+    const nextDate = toDateInputValue(day);
+    onChange(nextDate, time || "12:00");
+  }
+
+  function selectToday() {
+    const now = new Date();
+    onChange(toDateInputValue(now), toTimeInputValue(now));
+  }
+
+  return (
+    <div className="grid gap-2">
+      <Label>Expira em</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" className="justify-between font-normal">
+            <span className="flex min-w-0 items-center gap-2">
+              <CalendarDays className="h-4 w-4 shrink-0" />
+              <span className="truncate">{selectedLabel}</span>
+            </span>
+            <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[22rem] p-3">
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-sm font-medium capitalize">
+                {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(viewMonth)}
+              </div>
+              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              {weekDays.map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {days.map((day, index) => (
+                <Button
+                  key={`${day ? day.toISOString() : "empty"}-${index}`}
+                  type="button"
+                  variant={day && selectedDate && isSameDay(day, selectedDate) ? "default" : "ghost"}
+                  className="h-8 w-8 p-0 text-sm"
+                  disabled={!day}
+                  onClick={() => day && selectDay(day)}
+                >
+                  {day ? day.getDate() : ""}
+                </Button>
+              ))}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <Input
+                type="date"
+                value={date}
+                onChange={(event) => onChange(event.target.value, time || "12:00")}
+              />
+              <Input
+                type="time"
+                value={time}
+                onChange={(event) => onChange(date || toDateInputValue(new Date()), event.target.value)}
+              />
+              <Button type="button" variant="outline" onClick={selectToday}>
+                Agora
+              </Button>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  onChange("", "");
+                }}
+              >
+                Limpar
+              </Button>
+              <Button type="button" onClick={() => setOpen(false)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+      <p className="text-xs text-muted-foreground">Escolha uma data no calendário e ajuste o horário no painel.</p>
+    </div>
+  );
+}
+
 function LinksList({
   links,
   showOwner,
@@ -757,6 +918,16 @@ function LinksList({
 }) {
   const hasActions = Boolean(onEdit || onRequestDelete || onRequestQr || onToggleFavorite || onTogglePinned);
 
+  function signalLabels(link: LinkSummary): string[] {
+    return [
+      link.favorite ? "Favorito" : null,
+      link.pinned ? "Fixado" : null,
+      link.safetyStatus !== "clean" ? link.safetyStatus : null,
+      link.countryAllowlist.length > 0 ? `+${link.countryAllowlist.join(",")}` : null,
+      link.countryBlocklist.length > 0 ? `-${link.countryBlocklist.join(",")}` : null
+    ].filter((value): value is string => Boolean(value));
+  }
+
   return (
     <div className="grid min-w-0 gap-3">
       <div className="grid min-w-0 gap-3 md:hidden">
@@ -764,7 +935,7 @@ function LinksList({
           <div key={link.id} className="grid gap-3 overflow-hidden rounded-md border p-3 text-sm">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <label className="flex min-w-0 flex-1 items-start gap-2">
-                {onToggleSelected && <input checked={selectedIds.includes(link.id)} onChange={() => onToggleSelected(link.id)} type="checkbox" className="mt-1" />}
+                {onToggleSelected && <Checkbox checked={selectedIds.includes(link.id)} onCheckedChange={() => onToggleSelected(link.id)} className="mt-1" />}
                 <div className="min-w-0 flex-1">
                   <a className="block truncate font-medium text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
                     {publicHostname}/{link.alias}
@@ -788,21 +959,15 @@ function LinksList({
                   Senha
                 </Badge>
               )}
-              {link.favorite && <Badge className="w-fit">Favorito</Badge>}
-              {link.pinned && <Badge className="w-fit">Fixado</Badge>}
               {showOwner && <Badge className="w-fit max-w-full truncate">{link.ownerEmail ?? shortId(link.ownerId)}</Badge>}
             </div>
-            <div className="flex max-h-24 flex-col items-start gap-1 overflow-y-auto pr-1">
-              {link.tags.length > 0 ? (
-                link.tags.map((tag) => (
-                  <Badge key={tag} className="w-fit max-w-full gap-1">
-                    <Tags className="h-3 w-3" />
-                    <span className="truncate">{tag}</span>
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-xs text-muted-foreground">Sem tags</span>
-              )}
+            <div className="flex max-h-24 flex-col items-start gap-1 overflow-hidden pr-1">
+              {signalLabels(link).slice(0, 3).map((signal) => (
+                <Badge key={signal} className="w-full max-w-full truncate">
+                  {signal}
+                </Badge>
+              ))}
+              {signalLabels(link).length > 3 && <Badge className="w-fit">...</Badge>}
             </div>
             <div className="flex flex-wrap gap-2">
               {onToggleFavorite && (
@@ -829,17 +994,17 @@ function LinksList({
 
       <div className="hidden min-w-0 md:block">
         <div className="overflow-x-auto rounded-md border">
-          <Table className="min-w-[960px] table-fixed">
+          <Table className="min-w-[840px] table-fixed">
             <TableHeader>
               <TableRow>
                 {onToggleSelected && <TableHead className="w-10" />}
-                <TableHead className="w-[14rem]">Curto</TableHead>
-                <TableHead className="w-[18rem]">Destino</TableHead>
-                {showOwner && <TableHead className="w-[14rem]">Dono</TableHead>}
+                <TableHead className="w-[12rem]">Curto</TableHead>
+                <TableHead className="w-[14rem]">Destino</TableHead>
+                {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead className="w-24">Cliques</TableHead>
-                <TableHead className="w-[12rem]">Sinais</TableHead>
-                {hasActions && <TableHead className="w-16">Ações</TableHead>}
+                <TableHead className="w-[10rem]">Sinais</TableHead>
+                {hasActions && <TableHead className="w-14">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -847,24 +1012,24 @@ function LinksList({
                 <TableRow key={link.id}>
                   {onToggleSelected && (
                     <TableCell>
-                      <input checked={selectedIds.includes(link.id)} onChange={() => onToggleSelected(link.id)} type="checkbox" />
+                      <Checkbox checked={selectedIds.includes(link.id)} onCheckedChange={() => onToggleSelected(link.id)} />
                     </TableCell>
                   )}
-                  <TableCell className="min-w-0 font-medium">
-                    <div className="flex items-center gap-2">
-                      <a className="text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
+                  <TableCell className="min-w-0 overflow-hidden font-medium">
+                    <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                      <a className="block min-w-0 truncate text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
                         {publicHostname}/{link.alias}
                       </a>
                       <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
                     </div>
                     {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
                   </TableCell>
-                  <TableCell className="min-w-0">
-                    <div className="max-w-full truncate">{link.destinationUrl}</div>
+                  <TableCell className="min-w-0 overflow-hidden">
+                    <div className="block w-full truncate">{link.destinationUrl}</div>
                   </TableCell>
                   {showOwner && (
-                    <TableCell className="min-w-0">
-                      <div className="max-w-full truncate">{link.ownerEmail ?? shortId(link.ownerId)}</div>
+                    <TableCell className="min-w-0 overflow-hidden">
+                      <div className="block w-full truncate">{link.ownerEmail ?? shortId(link.ownerId)}</div>
                     </TableCell>
                   )}
                   <TableCell>
@@ -880,12 +1045,13 @@ function LinksList({
                   </TableCell>
                   <TableCell>{link.clickCount}</TableCell>
                   <TableCell>
-                    <div className="flex max-h-24 max-w-48 flex-col items-start gap-1 overflow-y-auto pr-1">
-                      {link.favorite && <Badge className="w-fit max-w-full">Favorito</Badge>}
-                      {link.pinned && <Badge className="w-fit max-w-full">Fixado</Badge>}
-                      {link.safetyStatus !== "clean" && <Badge className="w-fit max-w-full">{link.safetyStatus}</Badge>}
-                      {link.countryAllowlist.length > 0 && <Badge className="w-fit max-w-full truncate">+{link.countryAllowlist.join(",")}</Badge>}
-                      {link.countryBlocklist.length > 0 && <Badge className="w-fit max-w-full truncate">-{link.countryBlocklist.join(",")}</Badge>}
+                    <div className="flex max-h-24 max-w-40 flex-col items-start gap-1 overflow-hidden pr-1">
+                      {signalLabels(link).slice(0, 3).map((signal) => (
+                        <Badge key={signal} className="w-full max-w-full truncate">
+                          {signal}
+                        </Badge>
+                      ))}
+                      {signalLabels(link).length > 3 && <Badge className="w-fit">...</Badge>}
                     </div>
                   </TableCell>
                   {hasActions && (
@@ -1062,7 +1228,7 @@ function AuditLogsList({ logs }: { logs: AuditLog[] }) {
     <>
       <div className="grid min-w-0 gap-3 md:hidden">
         {logs.map((log) => (
-          <div key={log.id} className="grid gap-2 rounded-md border p-3 text-sm">
+          <div key={log.id} className="grid gap-2 overflow-hidden rounded-md border p-3 text-sm">
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">{log.action}</span>
               <Badge>{severityLabel(log.severity)}</Badge>
@@ -1258,19 +1424,19 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
         ))}
       </div>
       <div className="hidden min-w-0 md:block">
-        <Table className="min-w-[960px] table-fixed">
+        <Table className="min-w-[840px] table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">
                 <Skeleton className="h-4 w-4" />
               </TableHead>
-              <TableHead className="w-[14rem]">Curto</TableHead>
-              <TableHead className="w-[18rem]">Destino</TableHead>
-              {showOwner && <TableHead className="w-[14rem]">Dono</TableHead>}
+              <TableHead className="w-[12rem]">Curto</TableHead>
+              <TableHead className="w-[14rem]">Destino</TableHead>
+              {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
               <TableHead className="w-28">Status</TableHead>
               <TableHead className="w-24">Cliques</TableHead>
-              <TableHead className="w-[12rem]">Sinais</TableHead>
-              {hasActions && <TableHead className="w-16">Ações</TableHead>}
+              <TableHead className="w-[10rem]">Sinais</TableHead>
+              {hasActions && <TableHead className="w-14">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1637,12 +1803,13 @@ function AuditMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {entries.map(([key, value]) => (
-        <Badge key={key} className="max-w-full truncate">
+    <div className="flex max-w-full flex-col items-start gap-1 overflow-hidden">
+      {entries.slice(0, 3).map(([key, value]) => (
+        <Badge key={key} className="w-full max-w-full truncate">
           {key}: {String(value)}
         </Badge>
       ))}
+      {entries.length > 3 && <Badge className="w-fit">...</Badge>}
     </div>
   );
 }
@@ -1707,7 +1874,8 @@ function stateFromLink(link: LinkSummary | null): LinkFormState {
       clearPassword: false,
       redirectCode: "302",
       expiresPreset: "none",
-      expiresAt: "",
+      expiresDate: "",
+      expiresTime: "",
       clickLimit: "",
       inactiveMinutes: "",
       countryAllowlist: "",
@@ -1716,6 +1884,8 @@ function stateFromLink(link: LinkSummary | null): LinkFormState {
       pinned: false
     };
   }
+
+  const expiresParts = link.expiresAt ? toLocalDateParts(link.expiresAt) : null;
 
   return {
     destinationUrl: link.destinationUrl,
@@ -1726,7 +1896,8 @@ function stateFromLink(link: LinkSummary | null): LinkFormState {
     clearPassword: false,
     redirectCode: link.redirectCode === 301 ? "301" : "302",
     expiresPreset: link.expiresAt ? "custom" : "none",
-    expiresAt: link.expiresAt ? toDatetimeLocal(link.expiresAt) : "",
+    expiresDate: expiresParts?.date ?? "",
+    expiresTime: expiresParts?.time ?? "",
     clickLimit: link.clickLimit ? String(link.clickLimit) : "",
     inactiveMinutes: link.inactiveExpiresAfterMinutes ? String(link.inactiveExpiresAfterMinutes) : "",
     countryAllowlist: link.countryAllowlist.join(", "),
@@ -1744,7 +1915,7 @@ function formToInput(form: LinkFormState, mode: EditorMode): LinkFormInput {
     tags: parseDelimited(form.tags),
     password: form.clearPassword ? null : mode === "edit" && !form.password.trim() ? undefined : form.password.trim() || null,
     redirectCode: form.redirectCode === "301" ? 301 : 302,
-    expiresAt: computeExpiresAt(form.expiresPreset, form.expiresAt),
+    expiresAt: computeExpiresAt(form.expiresPreset, form.expiresDate, form.expiresTime),
     clickLimit: form.clickLimit ? Number(form.clickLimit) : null,
     inactiveExpiresAfterMinutes: form.inactiveMinutes ? Number(form.inactiveMinutes) : null,
     countryAllowlist: parseCountryCodes(form.countryAllowlist),
@@ -1788,7 +1959,7 @@ function parseCountryCodes(value: string): string[] {
   return parseDelimited(value).map((item) => item.toUpperCase()).slice(0, 20);
 }
 
-function computeExpiresAt(preset: LinkFormState["expiresPreset"], custom: string): string | null {
+function computeExpiresAt(preset: LinkFormState["expiresPreset"], date: string, time: string): string | null {
   const now = new Date();
   if (preset === "none") {
     return null;
@@ -1805,13 +1976,62 @@ function computeExpiresAt(preset: LinkFormState["expiresPreset"], custom: string
     tomorrow.setHours(23, 59, 59, 999);
     return tomorrow.toISOString();
   }
-  return custom ? new Date(custom).toISOString() : null;
+  return date && time ? new Date(`${date}T${time}`).toISOString() : null;
 }
 
-function toDatetimeLocal(value: string): string {
+function toLocalDateParts(value: string): { date: string; time: string } {
   const date = new Date(value);
   const pad = (number: number) => String(number).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return {
+    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  };
+}
+
+function toDateInputValue(value: Date): string {
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+function toTimeInputValue(value: Date): string {
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+function formatDateTimeLabel(date: string, time: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(`${date}T${time}`));
+}
+
+function startOfMonth(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), 1);
+}
+
+function buildMonthDays(month: Date): Array<Date | null> {
+  const start = startOfMonth(month);
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const leadingDays = start.getDay();
+  const cells: Array<Date | null> = [];
+
+  for (let index = 0; index < leadingDays; index += 1) {
+    cells.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(new Date(month.getFullYear(), month.getMonth(), day));
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
+}
+
+function isSameDay(left: Date, right: Date): boolean {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
 }
 
 type LinkFormState = {
@@ -1823,7 +2043,8 @@ type LinkFormState = {
   clearPassword: boolean;
   redirectCode: "301" | "302";
   expiresPreset: "none" | "1h" | "24h" | "tomorrow" | "custom";
-  expiresAt: string;
+  expiresDate: string;
+  expiresTime: string;
   clickLimit: string;
   inactiveMinutes: string;
   countryAllowlist: string;
