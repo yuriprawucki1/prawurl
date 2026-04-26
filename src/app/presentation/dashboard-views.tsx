@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import {
   CalendarDays,
   ArrowUpDown,
+  Ban,
   Check,
   Copy,
   ChevronLeft,
@@ -44,6 +45,7 @@ import { resolveOrigins } from "../lib/origins";
 import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { normalizeDestinationUrlInput } from "../../shared/validation";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../components/ui/accordion";
 import { Badge } from "../components/ui/badge";
 import { Checkbox } from "../components/ui/checkbox";
 import { Button } from "../components/ui/button";
@@ -317,6 +319,10 @@ function LinkWorkspace({
   async function toggleStatus(ids: string[], action: "activate" | "deactivate") {
     await bulkAction({ ids, action });
     setSelectedIds([]);
+    toast({
+      title: action === "activate" ? "Links ativados" : "Links desativados",
+      description: `${ids.length} link${ids.length === 1 ? "" : "s"} atualizado${ids.length === 1 ? "" : "s"}.`
+    });
     refresh();
   }
 
@@ -329,6 +335,10 @@ function LinkWorkspace({
     anchor.download = `${scope}-links-export.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
+    toast({
+      title: "Exportação iniciada",
+      description: `${selectedIds.length} link${selectedIds.length === 1 ? "" : "s"} no arquivo CSV.`
+    });
   }
 
   async function toggleFavorite(link: LinkSummary) {
@@ -369,6 +379,16 @@ function LinkWorkspace({
               links={links}
               showOwner={showOwner}
               selectedIds={selectedIds}
+              onToggleAll={() =>
+                setSelectedIds((current) => {
+                  const visibleIds = links.map((link) => link.id);
+                  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => current.includes(id));
+                  if (allVisibleSelected) {
+                    return current.filter((id) => !visibleIds.includes(id));
+                  }
+                  return Array.from(new Set([...current, ...visibleIds]));
+                })
+              }
               onToggleSelected={(id) =>
                 setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
               }
@@ -392,7 +412,12 @@ function LinkWorkspace({
         onExport={exportSelected}
         onDelete={async () => {
           await bulkAction({ ids: selectedIds, action: "delete" });
+          const deletedCount = selectedIds.length;
           setSelectedIds([]);
+          toast({
+            title: "Links excluídos",
+            description: `${deletedCount} link${deletedCount === 1 ? "" : "s"} removido${deletedCount === 1 ? "" : "s"}.`
+          });
           refresh();
         }}
         onClear={() => setSelectedIds([])}
@@ -564,31 +589,42 @@ function BulkActionsBar({
     <div className="pointer-events-none fixed inset-x-3 bottom-4 z-40 flex justify-center sm:bottom-6">
       <div
         data-testid="bulk-actions-bar"
-        className="pointer-events-auto flex w-full max-w-[min(42rem,calc(100vw-1.5rem))] flex-wrap items-center justify-center gap-2 rounded-lg border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-lg sm:w-fit sm:justify-start"
+        className="pointer-events-auto flex w-fit max-w-[calc(100vw-1.5rem)] items-center justify-center gap-1 rounded-lg border bg-popover px-2 py-2 text-sm text-popover-foreground shadow-lg"
       >
-        <div className="flex min-w-0 items-center gap-2 pr-1 font-medium">
+        <div className="flex min-w-0 items-center gap-2 px-2 font-medium">
           <Badge className="shrink-0 bg-primary text-primary-foreground">{selectedCount}</Badge>
-          <span className="whitespace-nowrap">selecionado{selectedCount === 1 ? "" : "s"}</span>
+          <span className="hidden whitespace-nowrap sm:inline">selecionado{selectedCount === 1 ? "" : "s"}</span>
         </div>
-        <Button size="sm" variant="outline" onClick={onActivate}>
-          Ativar
-        </Button>
-        <Button size="sm" variant="outline" onClick={onDeactivate}>
-          Desativar
-        </Button>
-        <Button size="sm" variant="outline" onClick={onExport}>
-          <Upload className="h-4 w-4" />
-          Exportar
-        </Button>
-        <Button size="sm" variant="destructive" onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
-          Excluir
-        </Button>
-        <Button size="icon-sm" variant="ghost" onClick={onClear} aria-label="Limpar seleção">
-          <X className="h-4 w-4" />
-        </Button>
+        <BulkActionButton label="Ativar selecionados" icon={<Check className="h-4 w-4" />} onClick={onActivate} />
+        <BulkActionButton label="Desativar selecionados" icon={<Ban className="h-4 w-4" />} onClick={onDeactivate} />
+        <BulkActionButton label="Exportar selecionados" icon={<Upload className="h-4 w-4" />} onClick={onExport} />
+        <BulkActionButton label="Excluir selecionados" icon={<Trash2 className="h-4 w-4" />} onClick={onDelete} variant="destructive" />
+        <BulkActionButton label="Limpar seleção" icon={<X className="h-4 w-4" />} onClick={onClear} variant="ghost" />
       </div>
     </div>
+  );
+}
+
+function BulkActionButton({
+  label,
+  icon,
+  onClick,
+  variant = "outline"
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void | Promise<void>;
+  variant?: React.ComponentProps<typeof Button>["variant"];
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="icon-sm" variant={variant} onClick={onClick} aria-label={label}>
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -611,6 +647,24 @@ function EditorSection({
       </div>
       <div className="grid min-w-0 gap-4">{children}</div>
     </section>
+  );
+}
+
+function EditorAccordionLabel({
+  title,
+  icon,
+  children
+}: {
+  title: string;
+  icon: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
+      <span className="truncate">{title}</span>
+      {children}
+    </span>
   );
 }
 
@@ -664,43 +718,50 @@ function LinkEditorDialog({
 
   const content = (
     <form className="grid min-w-0 gap-4" onSubmit={submit}>
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
-        <div className="grid min-w-0 gap-4">
-          <EditorSection title="Destino" icon={<LinkIcon className="h-4 w-4" />}>
-            <div className="grid min-w-0 gap-2">
-              <Label>URL destino</Label>
-              <Input
-                value={form.destinationUrl}
-                onChange={(event) => setForm((current) => ({ ...current, destinationUrl: event.target.value }))}
-                placeholder="https://..."
-                autoCapitalize="none"
-                autoCorrect="off"
-                inputMode="url"
-              />
-            </div>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <div className="grid min-w-0 gap-2">
-                <Label>Alias</Label>
-                <Input
-                  value={form.alias}
-                  onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
-                  placeholder="Opcional"
-                  disabled={mode === "edit"}
-                />
-              </div>
-              <div className="grid min-w-0 gap-2">
-                <Label>Título</Label>
-                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
-              </div>
-            </div>
-            <div className="grid min-w-0 gap-2">
-              <Label>Tags</Label>
-              <Input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="portfolio, pessoal" />
-            </div>
-          </EditorSection>
+      <EditorSection title="Destino" icon={<LinkIcon className="h-4 w-4" />}>
+        <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="grid min-w-0 gap-2">
+            <Label>URL destino</Label>
+            <Input
+              value={form.destinationUrl}
+              onChange={(event) => setForm((current) => ({ ...current, destinationUrl: event.target.value }))}
+              placeholder="https://..."
+              autoCapitalize="none"
+              autoCorrect="off"
+              inputMode="url"
+            />
+          </div>
+          <div className="grid min-w-0 gap-2">
+            <Label>Alias</Label>
+            <Input
+              value={form.alias}
+              onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
+              placeholder="Opcional"
+              disabled={mode === "edit"}
+            />
+          </div>
+        </div>
+        <div className="grid min-w-0 gap-4 md:grid-cols-2">
+          <div className="grid min-w-0 gap-2">
+            <Label>Título</Label>
+            <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
+          </div>
+          <div className="grid min-w-0 gap-2">
+            <Label>Tags</Label>
+            <Input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="portfolio, pessoal" />
+          </div>
+        </div>
+      </EditorSection>
 
-          <EditorSection title="Proteção" icon={<Lock className="h-4 w-4" />}>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+      <Accordion type="single" collapsible className="grid min-w-0 gap-3">
+        <AccordionItem value="protecao">
+          <AccordionTrigger>
+            <EditorAccordionLabel title="Proteção" icon={<Lock className="h-4 w-4" />}>
+              {hasPassword && <Badge className="w-fit gap-1">Senha definida</Badge>}
+            </EditorAccordionLabel>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid min-w-0 gap-4 md:grid-cols-2">
               <div className="grid min-w-0 gap-2">
                 <Label>Senha</Label>
                 <Input
@@ -741,12 +802,17 @@ function LinkEditorDialog({
                 </Button>
               </div>
             )}
-          </EditorSection>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="grid min-w-0 gap-4">
-          <EditorSection title="Regras" icon={<Clock3 className="h-4 w-4" />}>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <AccordionItem value="regras">
+          <AccordionTrigger>
+            <EditorAccordionLabel title="Regras" icon={<Clock3 className="h-4 w-4" />}>
+              {form.expiresPreset !== "none" && <Badge className="w-fit">Expiração ativa</Badge>}
+            </EditorAccordionLabel>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid min-w-0 gap-4 md:grid-cols-3">
               <div className="grid min-w-0 gap-2">
                 <Label>Expiração</Label>
                 <Select value={form.expiresPreset} onValueChange={(value) => setForm((current) => ({ ...current, expiresPreset: value as LinkFormState["expiresPreset"] }))}>
@@ -778,10 +844,17 @@ function LinkEditorDialog({
                 onChange={(date, time) => setForm((current) => ({ ...current, expiresDate: date, expiresTime: time }))}
               />
             )}
-          </EditorSection>
+          </AccordionContent>
+        </AccordionItem>
 
-          <EditorSection title="Segmentação" icon={<Shield className="h-4 w-4" />}>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <AccordionItem value="segmentacao">
+          <AccordionTrigger>
+            <EditorAccordionLabel title="Segmentação" icon={<Shield className="h-4 w-4" />}>
+              {(form.countryAllowlist || form.countryBlocklist) && <Badge className="w-fit">Países configurados</Badge>}
+            </EditorAccordionLabel>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid min-w-0 gap-4 md:grid-cols-2">
               <CountryMultiSelectField
                 label="Países permitidos"
                 placeholder="Buscar e adicionar países"
@@ -795,9 +868,16 @@ function LinkEditorDialog({
                 onChange={(value) => setForm((current) => ({ ...current, countryBlocklist: value }))}
               />
             </div>
-          </EditorSection>
+          </AccordionContent>
+        </AccordionItem>
 
-          <EditorSection title="Organização" icon={<Star className="h-4 w-4" />}>
+        <AccordionItem value="organizacao">
+          <AccordionTrigger>
+            <EditorAccordionLabel title="Organização" icon={<Star className="h-4 w-4" />}>
+              {(form.favorite || form.pinned) && <Badge className="w-fit">Marcadores ativos</Badge>}
+            </EditorAccordionLabel>
+          </AccordionTrigger>
+          <AccordionContent>
             <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               <label className="flex min-h-10 items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm">
                 <Checkbox checked={form.favorite} onCheckedChange={(checked) => setForm((current) => ({ ...current, favorite: checked }))} />
@@ -808,9 +888,9 @@ function LinkEditorDialog({
                 Fixar no topo
               </label>
             </div>
-          </EditorSection>
-        </div>
-      </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {formError && <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError}</p>}
       <div className="flex flex-col-reverse gap-2 border-t pt-3 sm:flex-row sm:justify-end">
@@ -839,7 +919,7 @@ function LinkEditorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Novo link" : "Editar link"}</DialogTitle>
@@ -984,6 +1064,7 @@ function LinksList({
   links,
   showOwner,
   selectedIds = [],
+  onToggleAll,
   onToggleSelected,
   onEdit,
   onRequestDelete,
@@ -994,6 +1075,7 @@ function LinksList({
   links: LinkSummary[];
   showOwner: boolean;
   selectedIds?: string[];
+  onToggleAll?: () => void;
   onToggleSelected?: (id: string) => void;
   onEdit?: (link: LinkSummary) => void;
   onRequestDelete?: (link: LinkSummary) => void;
@@ -1003,6 +1085,7 @@ function LinksList({
 }) {
   const hasActions = Boolean(onEdit || onRequestDelete || onRequestQr || onToggleFavorite || onTogglePinned);
   const tableMinWidth = showOwner ? "min-w-[980px]" : "min-w-[860px]";
+  const allVisibleSelected = links.length > 0 && links.every((link) => selectedIds.includes(link.id));
 
   function signalLabels(link: LinkSummary): string[] {
     return [
@@ -1083,7 +1166,11 @@ function LinksList({
           <Table className={`${tableMinWidth} table-fixed`}>
             <TableHeader>
               <TableRow>
-                {onToggleSelected && <TableHead className="w-10" />}
+                {onToggleSelected && (
+                  <TableHead className="w-10">
+                    <Checkbox checked={allVisibleSelected} onCheckedChange={() => onToggleAll?.()} aria-label={allVisibleSelected ? "Limpar seleção de todos os links" : "Selecionar todos os links"} />
+                  </TableHead>
+                )}
                 <TableHead className="w-[12rem]">Curto</TableHead>
                 <TableHead className="w-[14rem]">Destino</TableHead>
                 {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
@@ -1428,6 +1515,7 @@ function QrCodeDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     let active = true;
@@ -1455,7 +1543,7 @@ function QrCodeDialog({
   }, [link, open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>QR Code</DialogTitle>
@@ -1473,7 +1561,19 @@ function QrCodeDialog({
             variant="outline"
             onClick={async () => {
               if (link) {
-                await navigator.clipboard.writeText(`${publicOrigin}/${link.alias}`);
+                const value = `${publicOrigin}/${link.alias}`;
+                try {
+                  await navigator.clipboard.writeText(value);
+                  toast({
+                    title: "URL copiada",
+                    description: value
+                  });
+                } catch {
+                  toast({
+                    title: "Não foi possível copiar",
+                    description: "Tente copiar a URL manualmente."
+                  });
+                }
               }
             }}
           >

@@ -8,6 +8,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://127.0.0.1:4175",
+    permissions: ["clipboard-write"],
     trace: "retain-on-failure",
     screenshot: "only-on-failure"
   },

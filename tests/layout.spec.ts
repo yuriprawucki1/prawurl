@@ -64,7 +64,12 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
   await saveScreenshot(page, "links");
 
   const listBeforeSelection = await page.locator("[data-testid='links-list']").boundingBox();
-  await page.getByRole("checkbox").first().click();
+  const selectAll = page.getByLabel("Selecionar todos os links");
+  if (await selectAll.isVisible()) {
+    await selectAll.click();
+  } else {
+    await page.getByRole("checkbox").first().click();
+  }
   await expect(page.locator("[data-testid='bulk-actions-bar']")).toBeVisible();
   await expectHorizontallyInsideViewport(page, "[data-testid='bulk-actions-bar']");
   const listAfterSelection = await page.locator("[data-testid='links-list']").boundingBox();
@@ -76,8 +81,17 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
   await saveScreenshot(page, "bulk-actions");
   await page.getByRole("button", { name: "Limpar seleção" }).click();
 
+  const backgroundHeading = page.locator("h1").filter({ hasText: "Links" }).first();
+  const backgroundBeforeModal = await backgroundHeading.boundingBox();
   await page.getByRole("button", { name: "Novo link" }).click();
   await expect(page.getByRole("heading", { name: "Novo link" })).toBeVisible();
+  const backgroundAfterModal = await backgroundHeading.boundingBox();
+  expect(backgroundBeforeModal).not.toBeNull();
+  expect(backgroundAfterModal).not.toBeNull();
+  if (backgroundBeforeModal && backgroundAfterModal) {
+    expect(Math.abs(backgroundBeforeModal.x - backgroundAfterModal.x)).toBeLessThanOrEqual(1);
+  }
+  await page.getByRole("button", { name: "Regras" }).click();
   await page.getByRole("combobox").filter({ hasText: "Sem expiração" }).click();
   await page.getByRole("option", { name: "Personalizado" }).click();
   await page.getByText("Expira em").locator("..").getByRole("button").first().click();
@@ -116,13 +130,23 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
 
     await expectInsideViewport(page, "[data-slot='dropdown-menu-content']");
     await saveScreenshot(page, "admin-actions");
+    await page.getByRole("menuitem", { name: "QR Code" }).click();
+    await expect(page.getByRole("heading", { name: "QR Code" })).toBeVisible();
+    await page.getByRole("button", { name: "Copiar URL" }).click();
+    await expect(page.getByText(/URL copiada|Não foi possível copiar/)).toBeVisible();
+    await page.getByRole("button", { name: "Fechar", exact: true }).click();
+    await page.getByRole("button", { name: "Fechar toast" }).click();
+    await actionTrigger.click();
+    await expect(page.locator("[data-slot='dropdown-menu-content']")).toBeVisible();
     await page.getByRole("menuitem", { name: "Editar" }).click();
   } else {
     await page.getByRole("button", { name: "Editar" }).first().click();
   }
 
   await expect(page.getByRole("heading", { name: "Editar link" })).toBeVisible();
-  await expect(page.getByText("Senha definida")).toBeVisible();
+  await page.getByRole("button", { name: /Proteção/ }).click();
+  await expect(page.getByText("Senha definida").last()).toBeVisible();
+  await page.getByRole("button", { name: /Segmentação/ }).click();
   await page.getByPlaceholder("Adicionar país").first().fill("Portugal");
   await page.keyboard.press("Enter");
   await expect(page.getByText("PT · Portugal")).toBeVisible();
