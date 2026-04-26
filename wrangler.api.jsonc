@@ -49,5 +49,51 @@
         "max_batch_timeout": 10
       }
     ]
+  },
+  "env": {
+    "staging": {
+      "name": "prawurl-api-staging",
+      "routes": [
+        {
+          "pattern": "api.staging.prawurl.com/*",
+          "zone_name": "prawurl.com"
+        }
+      ],
+      "vars": {
+        "APP_ORIGIN": "https://app.staging.prawurl.com",
+        "PUBLIC_ORIGIN": "https://staging.prawurl.com",
+        "BOOTSTRAP_ADMIN_EMAIL": "yuriprawucki1@gmail.com",
+        "SESSION_COOKIE_NAME": "prawurl_session"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "PRAWURL_LINKS",
+          "id": "e2ab7ee7345046f6950b02bd07a2f130"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "prawurl-staging",
+          "database_id": "98ee97e5-50d4-433b-97be-868df2291f20",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "EVENTS",
+            "queue": "prawurl-events-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "prawurl-events-staging",
+            "max_batch_size": 25,
+            "max_batch_timeout": 10
+          }
+        ]
+      }
+    }
   }
 }

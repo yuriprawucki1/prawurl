@@ -1,6 +1,7 @@
 import type { CreateLinkInput, LinkSummary, PlatformSummary, SessionUser, User, AuditLog } from "../../shared/contracts";
+import { resolveOrigins } from "./origins";
 
-const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "https://api.prawurl.com";
+const { apiOrigin } = resolveOrigins();
 const mockApi = import.meta.env.VITE_MOCK_API === "true";
 
 const mockUser: User = {

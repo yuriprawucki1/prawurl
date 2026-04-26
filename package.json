@@ -13,9 +13,17 @@
     "test:watch": "vitest",
     "wrangler:types": "wrangler types --config wrangler.api.jsonc src/workers/api/worker-configuration.d.ts && wrangler types --config wrangler.redirect.jsonc src/workers/redirect/worker-configuration.d.ts",
     "deploy:api": "wrangler deploy --config wrangler.api.jsonc",
+    "deploy:api:production": "wrangler deploy --config wrangler.api.jsonc",
+    "deploy:api:staging": "wrangler deploy --config wrangler.api.jsonc --env staging",
     "deploy:redirect": "wrangler deploy --config wrangler.redirect.jsonc",
+    "deploy:redirect:production": "wrangler deploy --config wrangler.redirect.jsonc",
+    "deploy:redirect:staging": "wrangler deploy --config wrangler.redirect.jsonc --env staging",
     "deploy:web": "npm run build && wrangler pages deploy dist --project-name prawurl-web",
-    "deploy": "npm run build && npm run deploy:api && npm run deploy:redirect && wrangler pages deploy dist --project-name prawurl-web"
+    "deploy:web:production": "wrangler pages deploy dist --project-name prawurl-web",
+    "deploy:web:staging": "wrangler pages deploy dist --project-name prawurl-web-staging --branch staging",
+    "deploy:production": "npm run build && npm run deploy:api:production && npm run deploy:redirect:production && npm run deploy:web:production",
+    "deploy:staging": "npm run build && npm run deploy:api:staging && npm run deploy:redirect:staging && npm run deploy:web:staging",
+    "deploy": "npm run deploy:production"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

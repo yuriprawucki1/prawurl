@@ -1,0 +1,73 @@
+name: CI/CD Staging
+
+on:
+  push:
+    branches: ["staging"]
+  workflow_dispatch:
+
+concurrency:
+  group: prawurl-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Validar e publicar staging
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      VITE_API_ORIGIN: https://api.staging.prawurl.com
+      VITE_PUBLIC_ORIGIN: https://staging.prawurl.com
+      VITE_APP_ORIGIN: https://app.staging.prawurl.com
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar tipos
+        run: npm run lint
+
+      - name: Rodar testes
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Aplicar migrações D1 staging
+        run: npx wrangler d1 migrations apply prawurl-staging --remote --config wrangler.api.jsonc --env staging
+
+      - name: Publicar API Worker staging
+        run: npm run deploy:api:staging
+
+      - name: Publicar Redirect Worker staging
+        run: npm run deploy:redirect:staging
+
+      - name: Atualizar secrets do API Worker staging
+        env:
+          STAGING_SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
+          STAGING_GOOGLE_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_CLIENT_ID }}
+          STAGING_GOOGLE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_CLIENT_SECRET }}
+          STAGING_GITHUB_CLIENT_ID: ${{ secrets.STAGING_OAUTH_GITHUB_CLIENT_ID }}
+          STAGING_GITHUB_CLIENT_SECRET: ${{ secrets.STAGING_OAUTH_GITHUB_CLIENT_SECRET }}
+        run: |
+          node -e "const fs=require('fs'); const names=['STAGING_SESSION_SECRET','STAGING_GOOGLE_CLIENT_ID','STAGING_GOOGLE_CLIENT_SECRET','STAGING_GITHUB_CLIENT_ID','STAGING_GITHUB_CLIENT_SECRET']; fs.writeFileSync('/tmp/prawurl-api-staging-secrets.json', JSON.stringify(Object.fromEntries(names.map((name)=>[name.replace(/^STAGING_/, ''), process.env[name] || '']))));"
+          npx wrangler secret bulk /tmp/prawurl-api-staging-secrets.json --config wrangler.api.jsonc --env staging
+
+      - name: Atualizar secrets do Redirect Worker staging
+        env:
+          STAGING_LOG_HASH_SALT: ${{ secrets.STAGING_LOG_HASH_SALT }}
+        run: |
+          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-staging-secrets.json', JSON.stringify({ LOG_HASH_SALT: process.env.STAGING_LOG_HASH_SALT || '' }));"
+          npx wrangler secret bulk /tmp/prawurl-redirect-staging-secrets.json --config wrangler.redirect.jsonc --env staging
+
+      - name: Publicar Pages staging
+        run: npm run deploy:web:staging
