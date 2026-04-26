@@ -20,7 +20,7 @@ Created in the connected account:
 - D1 database: `prawurl` (`fbd6cd66-3f82-4072-9e18-fcdcd3be78d7`)
 - Queue: `prawurl-events`
 
-## Local Setup
+## Local Development
 
 ```bash
 npm install
@@ -28,6 +28,49 @@ cp .dev.vars.example .dev.vars
 npm run wrangler:types
 npm run dev
 ```
+
+`npm run dev` starts only the Vite frontend, usually at `http://localhost:5173`.
+
+Useful routes when `npm run dev` is running:
+
+- Public onepage: `http://localhost:5173/`
+- Status page: `http://localhost:5173/status`
+- Login screen: `http://localhost:5173/app`
+
+The dashboard is selected by path in local development. In production it is selected by host (`app.prawurl.com`). If you open only `/`, you will see the public onepage.
+
+To view the authenticated dashboard without OAuth or a local Worker, run the mocked frontend:
+
+```bash
+npm run dev:mock
+```
+
+Then open:
+
+```text
+http://localhost:5173/app
+```
+
+Mock mode uses a fake admin session and sample links, users, metrics and audit logs. It is intended for UI development only.
+
+By default the frontend calls the production API at `https://api.prawurl.com`. To point the frontend to a local API Worker, create `.env.local`:
+
+```bash
+VITE_API_ORIGIN=http://localhost:8787
+```
+
+Then run the API Worker in another terminal:
+
+```bash
+npx wrangler dev --config wrangler.api.jsonc --local --port 8787
+```
+
+For local OAuth callbacks, add these URLs in the Google/GitHub OAuth apps if you want to test real login locally. The API Worker uses the current request origin as OAuth callback origin during local development:
+
+- `http://localhost:8787/auth/google/callback`
+- `http://localhost:8787/auth/github/callback`
+
+For day-to-day UI work, use `http://localhost:5173/app`; if there is no valid session, it opens the login screen.
 
 ## Required Secrets
 
@@ -39,14 +82,7 @@ npx wrangler secret put GOOGLE_CLIENT_ID --config wrangler.api.jsonc
 npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.api.jsonc
 npx wrangler secret put GITHUB_CLIENT_ID --config wrangler.api.jsonc
 npx wrangler secret put GITHUB_CLIENT_SECRET --config wrangler.api.jsonc
-npx wrangler secret put TURNSTILE_SECRET_KEY --config wrangler.api.jsonc
 npx wrangler secret put LOG_HASH_SALT --config wrangler.redirect.jsonc
-```
-
-The Turnstile site key is public and can be provided at build time:
-
-```bash
-VITE_TURNSTILE_SITE_KEY=your-site-key npm run build
 ```
 
 OAuth callback URLs:
@@ -67,8 +103,6 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 OAUTH_GITHUB_CLIENT_ID
 OAUTH_GITHUB_CLIENT_SECRET
-TURNSTILE_SECRET_KEY
-VITE_TURNSTILE_SITE_KEY
 LOG_HASH_SALT
 ```
 

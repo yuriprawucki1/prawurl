@@ -32,7 +32,6 @@ interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   SESSION_SECRET: string;
-  TURNSTILE_SECRET_KEY?: string;
 }
 
 const providers = new Set(["google", "github"]);
@@ -120,7 +119,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   if (authStart && request.method === "GET") {
     const provider = authStart[1] as OAuthProvider;
     const state = randomToken();
-    const location = authorizationUrl(provider, oauthConfig(env), state);
+    const location = authorizationUrl(provider, oauthConfig(env, request), state);
     return redirect(location, 302, stateCookie(state, env));
   }
 
@@ -134,7 +133,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
       throw new Error("OAUTH_CODE_MISSING");
     }
 
-    const profile = await exchangeOAuthCode(provider, code, oauthConfig(env));
+    const profile = await exchangeOAuthCode(provider, code, oauthConfig(env, request));
     const user = await services.users.upsertOAuthUser({
       provider,
       providerAccountId: profile.providerAccountId,
@@ -301,10 +300,10 @@ async function requireSession(request: Request, env: Env) {
   return session;
 }
 
-function oauthConfig(env: Env) {
+function oauthConfig(env: Env, request: Request) {
   return {
     appOrigin: env.APP_ORIGIN,
-    apiOrigin: "https://api.prawurl.com",
+    apiOrigin: new URL(request.url).origin,
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,
     githubClientId: env.GITHUB_CLIENT_ID,

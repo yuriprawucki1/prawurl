@@ -8,10 +8,8 @@ import {
   ChevronsUpDown,
   Command,
   Copy,
-  Github,
   LayoutDashboard,
   LinkIcon,
-  Lock,
   Moon,
   QrCode,
   Shield,
@@ -272,7 +270,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
                       <span className="truncate font-medium">
                         {session.user.name ?? session.user.email}
                       </span>
-                      <span className="truncate text-xs text-muted-foreground">
+                      <span className="truncate text-xs text-sidebar-foreground/80">
                         {session.user.email}
                       </span>
                     </div>
@@ -290,7 +288,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
                     <span className="truncate text-sm font-medium">
                       {session.user.name ?? session.user.email}
                     </span>
-                    <span className="truncate text-xs font-normal text-muted-foreground">
+                    <span className="truncate text-xs font-normal text-sidebar-foreground/80">
                       {session.user.email}
                     </span>
                   </DropdownMenuLabel>
@@ -328,11 +326,11 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-10 items-center bg-background/95 px-3 backdrop-blur">
-          <SidebarTrigger className="h-7 w-7 p-0" />
+        <header className="sticky top-0 z-20 flex h-8 items-center bg-background/95 px-2 backdrop-blur">
+          <SidebarTrigger className="h-6 w-6 p-0 [&_svg]:h-3.5 [&_svg]:w-3.5" />
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 pt-2 md:p-8 md:pt-4">
+        <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 pt-2 md:p-8 md:pt-4">
           {view === "links" && <LinksView />}
           {view === "analytics" && <AnalyticsView />}
           {view === "admin" && session.user.role === "admin" && <AdminView />}
@@ -345,7 +343,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
 
 function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: () => void }) {
   return (
-    <main className="min-h-screen bg-background px-6 py-6">
+    <main className="min-h-screen bg-background px-5 py-4 md:px-6 md:py-6">
       <header className="mx-auto flex max-w-5xl items-center justify-between">
         <Button variant="ghost" onClick={() => (window.location.href = "https://prawurl.com")}>
           <ArrowLeft className="h-4 w-4" />
@@ -354,14 +352,14 @@ function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: ()
         {theme && onToggleTheme && <ThemeToggle theme={theme} onToggle={onToggleTheme} />}
       </header>
 
-      <section className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-5xl items-center gap-10 py-8 lg:grid-cols-[1fr_420px]">
+      <section className="mx-auto grid min-h-[calc(100vh-4.5rem)] max-w-5xl items-center gap-6 py-4 lg:grid-cols-[1fr_420px]">
         <div className="max-w-xl">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <LinkIcon className="h-6 w-6" />
           </div>
           <Badge className="mb-4 border-primary/20 bg-primary/10 text-primary">PrawURL Workspace</Badge>
-          <h1 className="text-4xl font-semibold tracking-normal md:text-5xl">Entre para gerenciar seus links.</h1>
-          <p className="mt-4 text-lg leading-8 text-muted-foreground">
+          <h1 className="text-3xl font-semibold tracking-normal md:text-5xl">Entre para gerenciar seus links.</h1>
+          <p className="mt-3 text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
             Crie aliases, acompanhe cliques, organize tags e mantenha seus redirects sob controle em um painel simples.
           </p>
         </div>
@@ -377,7 +375,7 @@ function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: ()
               Continuar com Google
             </Button>
             <Button variant="outline" onClick={() => (window.location.href = authUrl("github"))}>
-              <Github className="h-4 w-4" />
+              <GithubMark className="h-4 w-4" />
               Continuar com GitHub
             </Button>
             <p className="pt-2 text-xs leading-5 text-muted-foreground">
@@ -448,7 +446,7 @@ function LinksView() {
               </Label>
               <Input id="alias" value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="minha-url" />
             </div>
-            <Button className="self-end" type="submit" disabled={submitting}>
+            <Button className="w-full self-end md:w-auto" type="submit" disabled={submitting}>
               {submitting ? "Criando" : "Criar"}
             </Button>
             <div className="grid gap-2 md:col-span-2">
@@ -544,26 +542,40 @@ function UsersTable({ users }: { users: User[] }) {
         <CardDescription>Status, papéis e cadastros da plataforma.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table className="min-w-[760px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Criado em</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.email}</TableCell>
-                <TableCell><Badge>{roleLabel(user.role)}</Badge></TableCell>
-                <TableCell>{userStatusLabel(user.status)}</TableCell>
-                <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
+        <div className="grid gap-3 md:hidden">
+          {users.map((user) => (
+            <div key={user.id} className="grid gap-2 rounded-md border p-3 text-sm">
+              <div className="font-medium">{user.email}</div>
+              <div className="flex flex-wrap gap-2">
+                <Badge>{roleLabel(user.role)}</Badge>
+                <Badge>{userStatusLabel(user.status)}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground">{new Date(user.createdAt).toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block">
+          <Table className="min-w-[760px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Criado em</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell><Badge>{roleLabel(user.role)}</Badge></TableCell>
+                  <TableCell>{userStatusLabel(user.status)}</TableCell>
+                  <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -580,26 +592,40 @@ function AuditLogsView() {
       <PageTitle title="Auditoria" description="Eventos persistentes de auth, CRUD, admin e segurança." />
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Quando</TableHead>
-                <TableHead>Ação</TableHead>
-                <TableHead>Entidade</TableHead>
-                <TableHead>Severidade</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{new Date(log.occurredAt).toLocaleString()}</TableCell>
-                  <TableCell>{log.action}</TableCell>
-                  <TableCell>{log.entityType}</TableCell>
-                  <TableCell><Badge>{log.severity}</Badge></TableCell>
+          <div className="grid gap-3 md:hidden">
+            {logs.map((log) => (
+              <div key={log.id} className="grid gap-2 rounded-md border p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{log.action}</span>
+                  <Badge>{log.severity}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">{log.entityType}</div>
+                <div className="text-xs text-muted-foreground">{new Date(log.occurredAt).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Quando</TableHead>
+                  <TableHead>Ação</TableHead>
+                  <TableHead>Entidade</TableHead>
+                  <TableHead>Severidade</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>{new Date(log.occurredAt).toLocaleString()}</TableCell>
+                    <TableCell>{log.action}</TableCell>
+                    <TableCell>{log.entityType}</TableCell>
+                    <TableCell><Badge>{log.severity}</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </section>
@@ -614,49 +640,80 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
         <CardDescription>Lista operacional dos links encurtados.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table className="min-w-[820px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Curto</TableHead>
-              <TableHead>Destino</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Cliques</TableHead>
-              <TableHead>Tags</TableHead>
-              <TableHead>QR Code</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {links.map((link) => (
-              <TableRow key={link.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <a className="text-primary underline-offset-4 hover:underline" href={`https://prawurl.com/${link.alias}`} target="_blank" rel="noreferrer">
-                      prawurl.com/{link.alias}
-                    </a>
+        <div className="grid gap-3 md:hidden">
+          {links.map((link) => (
+            <div key={link.id} className="grid gap-3 rounded-md border p-3 text-sm">
+              <div className="min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <a className="min-w-0 truncate font-medium text-primary underline-offset-4 hover:underline" href={`https://prawurl.com/${link.alias}`} target="_blank" rel="noreferrer">
+                    prawurl.com/{link.alias}
+                  </a>
+                  <div className="flex shrink-0 gap-1">
                     <CopyLinkButton value={`https://prawurl.com/${link.alias}`} />
+                    <QrPreview value={`https://prawurl.com/${link.alias}`} compact />
                   </div>
-                  {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
-                </TableCell>
-                <TableCell className="max-w-xl truncate">{link.destinationUrl}</TableCell>
-                <TableCell><Badge>{linkStatusLabel(link.status)}</Badge></TableCell>
-                <TableCell>{link.clickCount}</TableCell>
-                <TableCell>
-                  <div className="flex max-w-48 flex-wrap gap-1">
-                    {link.tags.length > 0 ? link.tags.map((tag) => (
-                      <Badge key={tag} className="gap-1">
-                        <Tags className="h-3 w-3" />
-                        {tag}
-                      </Badge>
-                    )) : <span className="text-xs text-muted-foreground">Sem tags</span>}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <QrPreview value={`https://prawurl.com/${link.alias}`} />
-                </TableCell>
+                </div>
+                {link.title && <div className="mt-1 text-xs text-muted-foreground">{link.title}</div>}
+              </div>
+              <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{linkStatusLabel(link.status)}</Badge>
+                <span className="text-xs text-muted-foreground">{link.clickCount} cliques</span>
+                {link.tags.map((tag) => (
+                  <Badge key={tag} className="gap-1">
+                    <Tags className="h-3 w-3" />
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block">
+          <Table className="min-w-[820px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Curto</TableHead>
+                <TableHead>Destino</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Cliques</TableHead>
+                <TableHead>Tags</TableHead>
+                <TableHead>QR Code</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {links.map((link) => (
+                <TableRow key={link.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <a className="text-primary underline-offset-4 hover:underline" href={`https://prawurl.com/${link.alias}`} target="_blank" rel="noreferrer">
+                        prawurl.com/{link.alias}
+                      </a>
+                      <CopyLinkButton value={`https://prawurl.com/${link.alias}`} />
+                    </div>
+                    {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
+                  </TableCell>
+                  <TableCell className="max-w-xl truncate">{link.destinationUrl}</TableCell>
+                  <TableCell><Badge>{linkStatusLabel(link.status)}</Badge></TableCell>
+                  <TableCell>{link.clickCount}</TableCell>
+                  <TableCell>
+                    <div className="flex max-w-48 flex-wrap gap-1">
+                      {link.tags.length > 0 ? link.tags.map((tag) => (
+                        <Badge key={tag} className="gap-1">
+                          <Tags className="h-3 w-3" />
+                          {tag}
+                        </Badge>
+                      )) : <span className="text-xs text-muted-foreground">Sem tags</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <QrPreview value={`https://prawurl.com/${link.alias}`} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -682,7 +739,7 @@ function CopyLinkButton({ value }: { value: string }) {
   );
 }
 
-function QrPreview({ value }: { value: string }) {
+function QrPreview({ value, compact = false }: { value: string; compact?: boolean }) {
   const [src, setSrc] = useState<string>("");
 
   useEffect(() => {
@@ -694,7 +751,7 @@ function QrPreview({ value }: { value: string }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" aria-label="Abrir QR Code">
+        <Button variant="outline" size="icon" className={compact ? "h-8 w-8" : undefined} aria-label="Abrir QR Code">
           <QrCode className="h-4 w-4" />
         </Button>
       </DialogTrigger>
@@ -732,6 +789,17 @@ function GoogleIcon({ className }: { className?: string }) {
       <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.42l-3.22-2.5c-.9.6-2.04.95-3.39.95-2.6 0-4.8-1.76-5.59-4.12H3.08v2.59A9.99 9.99 0 0 0 12 22Z" />
       <path fill="#FBBC05" d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.08a10.01 10.01 0 0 0 0 9l3.33-2.59Z" />
       <path fill="#EA4335" d="M12 5.97c1.47 0 2.8.51 3.84 1.5l2.86-2.86A9.61 9.61 0 0 0 12 2 9.99 9.99 0 0 0 3.08 7.5l3.33 2.59C7.2 7.73 9.4 5.97 12 5.97Z" />
+    </svg>
+  );
+}
+
+function GithubMark({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 2C6.48 2 2 6.58 2 12.24c0 4.52 2.86 8.35 6.84 9.7.5.1.68-.22.68-.5 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.63.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.9 1.56 2.35 1.11 2.92.85.09-.67.35-1.11.63-1.37-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.27 9.27 0 0 1 12 6.95c.85 0 1.7.12 2.5.34 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .28.18.6.69.5A10.04 10.04 0 0 0 22 12.24C22 6.58 17.52 2 12 2Z"
+      />
     </svg>
   );
 }
@@ -804,8 +872,8 @@ function NavButton({
 function PageTitle({ title, description }: { title: string; description: string }) {
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-normal">{title}</h1>
-      <p className="mt-1 text-muted-foreground">{description}</p>
+      <h1 className="text-2xl font-semibold tracking-normal md:text-3xl">{title}</h1>
+      <p className="mt-1 text-sm text-muted-foreground md:text-base">{description}</p>
     </div>
   );
 }
@@ -823,6 +891,7 @@ function MetricCard({ title, value }: { title: string; value: number }) {
 
 function StatusPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
+  const checkedAt = useMemo(() => new Date().toLocaleTimeString(), [status]);
 
   useEffect(() => {
     fetch("https://api.prawurl.com/health")
@@ -831,25 +900,48 @@ function StatusPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () 
   }, []);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background px-6">
-      <div className="absolute right-6 top-6">
+    <main className="min-h-screen bg-background px-5 py-4 md:px-6 md:py-6">
+      <header className="mx-auto flex max-w-3xl items-center justify-between">
+        <Button variant="ghost" onClick={() => (window.location.href = "/")}>
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </Button>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-      </div>
-      <Card className="w-full max-w-xl">
-        <CardHeader>
-          <Badge className={status === "online" ? "w-fit border-primary/20 bg-primary/10 text-primary" : "w-fit"}>
-            {status === "checking" ? "Verificando" : status === "online" ? "API operacional" : "API indisponível"}
-          </Badge>
-          <CardTitle className="pt-4">Status do PrawURL</CardTitle>
-          <CardDescription>
-            Esta página consulta o health check da API e mostra um estado legível para operação.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-3">
-          <Button onClick={() => window.location.reload()}>Atualizar</Button>
-          <Button variant="outline" onClick={() => (window.location.href = "/")}>Voltar</Button>
-        </CardContent>
-      </Card>
+      </header>
+
+      <section className="mx-auto grid min-h-[calc(100vh-4.5rem)] max-w-3xl place-items-center py-4">
+        <Card className="w-full">
+          <CardHeader>
+            <Badge className={status === "online" ? "w-fit border-primary/20 bg-primary/10 text-primary" : "w-fit"}>
+              {status === "checking" ? "Verificando" : status === "online" ? "API operacional" : "API indisponível"}
+            </Badge>
+            <CardTitle className="pt-4">Status do PrawURL</CardTitle>
+            <CardDescription>
+              Monitoramento simples do Worker de API em `api.prawurl.com`.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="grid gap-3 rounded-md border bg-muted/40 p-4 text-sm md:grid-cols-3">
+              <div>
+                <div className="text-muted-foreground">API</div>
+                <div className="font-medium">api.prawurl.com</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Resultado</div>
+                <div className="font-medium">{status === "online" ? "Respondendo" : status === "offline" ? "Sem resposta" : "Consultando"}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Verificado</div>
+                <div className="font-medium">{checkedAt}</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => window.location.reload()}>Atualizar</Button>
+              <Button variant="outline" onClick={() => (window.location.href = "https://app.prawurl.com/app")}>Abrir app</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </main>
   );
 }
