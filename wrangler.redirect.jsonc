@@ -44,5 +44,41 @@
         "queue": "prawurl-events"
       }
     ]
+  },
+  "env": {
+    "staging": {
+      "name": "prawurl-redirect-staging",
+      "routes": [
+        {
+          "pattern": "staging.prawurl.com/*",
+          "zone_name": "prawurl.com"
+        }
+      ],
+      "vars": {
+        "PUBLIC_ORIGIN": "https://staging.prawurl.com"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "PRAWURL_LINKS",
+          "id": "e2ab7ee7345046f6950b02bd07a2f130"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "prawurl-staging",
+          "database_id": "98ee97e5-50d4-433b-97be-868df2291f20",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "EVENTS",
+            "queue": "prawurl-events-staging"
+          }
+        ]
+      }
+    }
   }
 }

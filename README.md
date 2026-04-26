@@ -111,7 +111,44 @@ The workflow validates TypeScript, runs tests, builds the frontend, applies D1 m
 ```bash
 npm run build
 npx wrangler d1 migrations apply prawurl --remote
-npm run deploy:api
-npm run deploy:redirect
-npm run deploy:web
+npm run deploy:api:production
+npm run deploy:redirect:production
+npm run deploy:web:production
+```
+
+## Staging
+
+Staging runs on the `staging` branch and deploys to separate Cloudflare resources:
+
+- API Worker: `prawurl-api-staging`
+- Redirect Worker: `prawurl-redirect-staging`
+- Pages project: `prawurl-web-staging`
+- D1: `prawurl-staging`
+- KV: `PRAWURL_LINKS_STAGING`
+- Queue: `prawurl-events-staging`
+
+Target URLs:
+
+- `https://staging.prawurl.com`
+- `https://app.staging.prawurl.com`
+- `https://api.staging.prawurl.com`
+
+GitHub Actions secrets for staging:
+
+```text
+STAGING_SESSION_SECRET
+STAGING_GOOGLE_CLIENT_ID
+STAGING_GOOGLE_CLIENT_SECRET
+STAGING_OAUTH_GITHUB_CLIENT_ID
+STAGING_OAUTH_GITHUB_CLIENT_SECRET
+STAGING_LOG_HASH_SALT
+```
+
+To deploy staging locally or from CI:
+
+```bash
+npm run build
+npm run deploy:api:staging
+npm run deploy:redirect:staging
+npm run deploy:web:staging
 ```
