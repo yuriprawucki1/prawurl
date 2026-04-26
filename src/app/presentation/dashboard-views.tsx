@@ -565,7 +565,7 @@ function LinkEditorDialog({
   onOpenChange: (open: boolean) => void;
   mode: EditorMode;
   initialLink: LinkSummary | null;
-    onSubmit: (input: LinkFormInput) => Promise<void>;
+  onSubmit: (input: LinkFormInput) => Promise<void>;
   busy: boolean;
 }) {
   const isMobile = useIsMobile();
@@ -602,8 +602,8 @@ function LinkEditorDialog({
   }
 
   const content = (
-    <form className="grid gap-4 p-4" onSubmit={submit}>
-      <div className="grid gap-2">
+    <form className="grid min-w-0 gap-5" onSubmit={submit}>
+      <div className="grid min-w-0 gap-2">
         <Label>URL destino</Label>
         <Input
           value={form.destinationUrl}
@@ -614,27 +614,27 @@ function LinkEditorDialog({
           inputMode="url"
         />
       </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label>Alias</Label>
-            <Input
-              value={form.alias}
-              onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
-              placeholder="Opcional"
-              disabled={mode === "edit"}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Título</Label>
-            <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
-          </div>
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <div className="grid min-w-0 gap-2">
+          <Label>Alias</Label>
+          <Input
+            value={form.alias}
+            onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
+            placeholder="Opcional"
+            disabled={mode === "edit"}
+          />
         </div>
-      <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
+          <Label>Título</Label>
+          <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
+        </div>
+      </div>
+      <div className="grid min-w-0 gap-2">
         <Label>Tags</Label>
         <Input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="portfolio, pessoal" />
       </div>
-      <div className="grid gap-2 md:grid-cols-2">
-        <div className="grid gap-2">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <div className="grid min-w-0 gap-2">
           <Label>Senha</Label>
           <Input
             type="password"
@@ -661,7 +661,7 @@ function LinkEditorDialog({
             </div>
           )}
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label>Redirect</Label>
           <Select value={form.redirectCode} onValueChange={(value) => setForm((current) => ({ ...current, redirectCode: value === "301" ? "301" : "302" }))}>
             <SelectTrigger>
@@ -674,8 +674,8 @@ function LinkEditorDialog({
           </Select>
         </div>
       </div>
-      <div className="grid gap-2 md:grid-cols-3">
-        <div className="grid gap-2">
+      <div className="grid min-w-0 gap-4 md:grid-cols-3">
+        <div className="grid min-w-0 gap-2">
           <Label>Expiração</Label>
           <Select value={form.expiresPreset} onValueChange={(value) => setForm((current) => ({ ...current, expiresPreset: value as LinkFormState["expiresPreset"] }))}>
             <SelectTrigger>
@@ -690,11 +690,11 @@ function LinkEditorDialog({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label>Limite de cliques</Label>
           <Input type="number" min="1" value={form.clickLimit} onChange={(event) => setForm((current) => ({ ...current, clickLimit: event.target.value }))} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label>Inatividade (min)</Label>
           <Input type="number" min="1" value={form.inactiveMinutes} onChange={(event) => setForm((current) => ({ ...current, inactiveMinutes: event.target.value }))} />
         </div>
@@ -706,7 +706,7 @@ function LinkEditorDialog({
           onChange={(date, time) => setForm((current) => ({ ...current, expiresDate: date, expiresTime: time }))}
         />
       )}
-      <div className="grid gap-2 md:grid-cols-2">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <CountryMultiSelectField
           label="Países permitidos"
           placeholder="Buscar e adicionar países"
@@ -730,12 +730,12 @@ function LinkEditorDialog({
           Fixar no topo
         </label>
       </div>
-      <div className="flex gap-2 pt-2">
-        <Button type="submit" disabled={busy}>
-          {busy ? "Salvando" : mode === "create" ? "Criar link" : "Salvar alterações"}
-        </Button>
+      <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
         <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
           Cancelar
+        </Button>
+        <Button type="submit" disabled={busy}>
+          {busy ? "Salvando" : mode === "create" ? "Criar link" : "Salvar alterações"}
         </Button>
       </div>
       {formError && <p className="text-sm text-destructive">{formError}</p>}
@@ -750,7 +750,7 @@ function LinkEditorDialog({
             <SheetTitle>{mode === "create" ? "Novo link" : "Editar link"}</SheetTitle>
             <SheetDescription>Senha, expiração, país, tags e organização.</SheetDescription>
           </SheetHeader>
-          {content}
+          <div className="px-4 pb-4">{content}</div>
         </SheetContent>
       </Sheet>
     );
@@ -778,6 +778,7 @@ function DateTimePickerField({
   time: string;
   onChange: (date: string, time: string) => void;
 }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(date ? new Date(`${date}T${time || "12:00"}`) : new Date()));
 
@@ -802,83 +803,96 @@ function DateTimePickerField({
     onChange(toDateInputValue(now), toTimeInputValue(now));
   }
 
-  return (
-    <div className="grid gap-2">
-      <Label>Expira em</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="justify-between font-normal">
-            <span className="flex min-w-0 items-center gap-2">
-              <CalendarDays className="h-4 w-4 shrink-0" />
-              <span className="truncate">{selectedLabel}</span>
-            </span>
-            <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+  const triggerButton = (
+    <Button type="button" variant="outline" className="min-w-0 justify-between font-normal" onClick={() => isMobile && setOpen((current) => !current)}>
+      <span className="flex min-w-0 items-center gap-2">
+        <CalendarDays className="h-4 w-4 shrink-0" />
+        <span className="truncate">{selectedLabel}</span>
+      </span>
+      <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Button>
+  );
+
+  const pickerPanel = (
+    <div data-testid="date-time-picker-panel" className="grid gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="text-sm font-medium capitalize">
+          {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(viewMonth)}
+        </div>
+        <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+        {weekDays.map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 place-items-center gap-1">
+        {days.map((day, index) => (
+          <Button
+            key={`${day ? day.toISOString() : "empty"}-${index}`}
+            type="button"
+            variant={day && selectedDate && isSameDay(day, selectedDate) ? "default" : "ghost"}
+            className="h-8 w-8 p-0 text-sm"
+            disabled={!day}
+            onClick={() => day && selectDay(day)}
+          >
+            {day ? day.getDate() : ""}
           </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-3">
-          <div className="grid gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="text-sm font-medium capitalize">
-                {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(viewMonth)}
-              </div>
-              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              {weekDays.map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {days.map((day, index) => (
-                <Button
-                  key={`${day ? day.toISOString() : "empty"}-${index}`}
-                  type="button"
-                  variant={day && selectedDate && isSameDay(day, selectedDate) ? "default" : "ghost"}
-                  className="h-8 w-8 p-0 text-sm"
-                  disabled={!day}
-                  onClick={() => day && selectDay(day)}
-                >
-                  {day ? day.getDate() : ""}
-                </Button>
-              ))}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <Input
-                type="date"
-                value={date}
-                onChange={(event) => onChange(event.target.value, time || "12:00")}
-              />
-              <Input
-                type="time"
-                value={time}
-                onChange={(event) => onChange(date || toDateInputValue(new Date()), event.target.value)}
-              />
-              <Button type="button" variant="outline" onClick={selectToday}>
-                Agora
-              </Button>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  onChange("", "");
-                }}
-              >
-                Limpar
-              </Button>
-              <Button type="button" onClick={() => setOpen(false)}>
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+        ))}
+      </div>
+      <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <Input
+          type="date"
+          value={date}
+          onChange={(event) => onChange(event.target.value, time || "12:00")}
+        />
+        <Input
+          type="time"
+          value={time}
+          onChange={(event) => onChange(date || toDateInputValue(new Date()), event.target.value)}
+        />
+        <Button type="button" variant="outline" onClick={selectToday}>
+          Agora
+        </Button>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            onChange("", "");
+          }}
+        >
+          Limpar
+        </Button>
+        <Button type="button" onClick={() => setOpen(false)}>
+          Fechar
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid min-w-0 gap-2">
+      <Label>Expira em</Label>
+      {isMobile ? (
+        <>
+          {triggerButton}
+          {open && <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-sm">{pickerPanel}</div>}
+        </>
+      ) : (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
+          <PopoverContent align="start" collisionPadding={20} className="w-[min(20rem,calc(100vw-2rem))] p-3">
+            {pickerPanel}
+          </PopoverContent>
+        </Popover>
+      )}
       <p className="text-xs text-muted-foreground">Escolha uma data no calendário e ajuste o horário no painel.</p>
     </div>
   );
@@ -906,6 +920,7 @@ function LinksList({
   onTogglePinned?: (link: LinkSummary) => void;
 }) {
   const hasActions = Boolean(onEdit || onRequestDelete || onRequestQr || onToggleFavorite || onTogglePinned);
+  const tableMinWidth = showOwner ? "min-w-[980px]" : "min-w-[860px]";
 
   function signalLabels(link: LinkSummary): string[] {
     return [
@@ -982,8 +997,8 @@ function LinksList({
       </div>
 
       <div className="hidden min-w-0 md:block">
-        <div className="overflow-x-auto rounded-md border">
-          <Table className="min-w-[840px] table-fixed">
+        <div className="rounded-md border">
+          <Table className={`${tableMinWidth} table-fixed`}>
             <TableHeader>
               <TableRow>
                 {onToggleSelected && <TableHead className="w-10" />}
@@ -993,7 +1008,7 @@ function LinksList({
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead className="w-24">Cliques</TableHead>
                 <TableHead className="w-28">Sinais</TableHead>
-                {hasActions && <TableHead className="w-14">Ações</TableHead>}
+                {hasActions && <TableHead className="w-20 text-center">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1044,7 +1059,7 @@ function LinksList({
                     </div>
                   </TableCell>
                   {hasActions && (
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap px-5">
                       <div className="flex justify-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1235,28 +1250,30 @@ function AuditLogsList({ logs }: { logs: AuditLog[] }) {
         ))}
       </div>
       <div className="hidden min-w-0 md:block">
-        <Table>
+        <Table className="min-w-[900px] table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead>Quando</TableHead>
-              <TableHead>Ação</TableHead>
-              <TableHead>Ator</TableHead>
-              <TableHead>Entidade</TableHead>
+              <TableHead className="w-44">Quando</TableHead>
+              <TableHead className="w-44">Ação</TableHead>
+              <TableHead className="w-28">Ator</TableHead>
+              <TableHead className="w-40">Entidade</TableHead>
               <TableHead>Dados</TableHead>
-              <TableHead>Severidade</TableHead>
+              <TableHead className="w-28">Severidade</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {logs.map((log) => (
               <TableRow key={log.id}>
-                <TableCell>{new Date(log.occurredAt).toLocaleString()}</TableCell>
-                <TableCell>{log.action}</TableCell>
+                <TableCell className="truncate">{new Date(log.occurredAt).toLocaleString()}</TableCell>
+                <TableCell className="truncate">{log.action}</TableCell>
                 <TableCell>{log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</TableCell>
-                <TableCell>
-                  {log.entityType}
-                  {log.entityId ? `/${shortId(log.entityId)}` : ""}
+                <TableCell className="truncate">
+                  <span>
+                    {log.entityType}
+                    {log.entityId ? `/${shortId(log.entityId)}` : ""}
+                  </span>
                 </TableCell>
-                <TableCell className="max-w-sm">
+                <TableCell className="min-w-0">
                   <AuditMetadata metadata={log.metadata} />
                 </TableCell>
                 <TableCell>
@@ -1413,7 +1430,7 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
         ))}
       </div>
       <div className="hidden min-w-0 md:block">
-        <Table className="min-w-[840px] table-fixed">
+        <Table className={`${showOwner ? "min-w-[980px]" : "min-w-[860px]"} table-fixed`}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">
@@ -1425,7 +1442,7 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
               <TableHead className="w-28">Status</TableHead>
               <TableHead className="w-24">Cliques</TableHead>
               <TableHead className="w-28">Sinais</TableHead>
-              {hasActions && <TableHead className="w-14">Ações</TableHead>}
+              {hasActions && <TableHead className="w-20 text-center">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1460,10 +1477,8 @@ function LinksTableSkeleton({ showOwner, hasActions }: { showOwner: boolean; has
                 </TableCell>
                 {hasActions && (
                   <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Skeleton className="h-8 w-8 rounded-full" />
-                      <Skeleton className="h-8 w-8 rounded-full" />
-                      <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="flex justify-center">
+                      <Skeleton className="h-8 w-8 rounded-md" />
                     </div>
                   </TableCell>
                 )}
@@ -1792,13 +1807,14 @@ function AuditMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   }
 
   return (
-    <div className="flex max-w-full flex-col items-start gap-1 overflow-hidden">
-      {entries.slice(0, 3).map(([key, value]) => (
-        <Badge key={key} className="w-full max-w-full truncate">
-          {key}: {String(value)}
+    <div className="flex max-w-full flex-wrap items-start gap-1.5 overflow-hidden">
+      {entries.map(([key, value]) => (
+        <Badge key={key} className="w-fit max-w-full">
+          <span className="truncate">
+            {key}: {String(value)}
+          </span>
         </Badge>
       ))}
-      {entries.length > 3 && <Badge className="w-fit">...</Badge>}
     </div>
   );
 }

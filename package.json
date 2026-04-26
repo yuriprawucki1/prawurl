@@ -11,6 +11,9 @@
     "lint": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:visual": "playwright test",
+    "test:visual:ui": "playwright test --ui",
+    "playwright:install": "playwright install chromium",
     "wrangler:types": "wrangler types --config wrangler.api.jsonc src/workers/api/worker-configuration.d.ts && wrangler types --config wrangler.redirect.jsonc src/workers/redirect/worker-configuration.d.ts",
     "deploy:api": "wrangler deploy --config wrangler.api.jsonc",
     "deploy:api:production": "wrangler deploy --config wrangler.api.jsonc",
@@ -40,6 +43,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.0",
     "@cloudflare/workers-types": "latest",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^22.10.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",

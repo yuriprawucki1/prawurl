@@ -22,6 +22,8 @@ Created in the connected account:
 
 ## Local Development
 
+Project conventions and UI quality notes live in [`docs/napkin.md`](docs/napkin.md).
+
 ```bash
 npm install
 cp .dev.vars.example .dev.vars
@@ -52,6 +54,13 @@ http://localhost:5173/app
 ```
 
 Mock mode uses a fake admin session and sample links, users, metrics and audit logs. It is intended for UI development only.
+
+For visual layout checks across desktop and mobile, install the Playwright browser once and run the visual suite:
+
+```bash
+npm run playwright:install
+npm run test:visual
+```
 
 By default the frontend calls the production API at `https://api.prawurl.com`. To point the frontend to a local API Worker, create `.env.local`:
 
