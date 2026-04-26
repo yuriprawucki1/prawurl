@@ -3,8 +3,9 @@ import type * as React from "react";
 import {
   Activity,
   BarChart3,
-  ChevronsUpDown,
+  Check,
   Command,
+  Copy,
   Github,
   LayoutDashboard,
   LinkIcon,
@@ -18,7 +19,7 @@ import {
   LogOut
 } from "lucide-react";
 import QRCode from "qrcode";
-import { api, authUrl, turnstileSiteKey } from "../lib/api";
+import { api, authUrl } from "../lib/api";
 import type { AuditLog, LinkSummary, PlatformSummary, SessionUser, User } from "../../shared/contracts";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -43,6 +44,7 @@ import {
   SidebarTrigger,
 } from "../components/ui/sidebar";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -235,8 +237,6 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
                         {session.user.email}
                       </span>
                     </div>
-
-                    <ChevronsUpDown className="ml-auto size-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
 
@@ -334,7 +334,6 @@ function LinksView() {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const refresh = () => api.links().then(({ links }) => setLinks(links)).catch((error) => setError(error instanceof Error ? error.message : "Erro ao carregar links."));
@@ -348,20 +347,16 @@ function LinksView() {
     setError(null);
     setSubmitting(true);
     try {
-      await api.createLink(
-        {
-          destinationUrl,
-          alias: alias || undefined,
-          title: title || undefined,
-          tags: parseTags(tags)
-        },
-        turnstileToken
-      );
+      await api.createLink({
+        destinationUrl,
+        alias: alias || undefined,
+        title: title || undefined,
+        tags: parseTags(tags)
+      });
       setDestinationUrl("");
       setAlias("");
       setTitle("");
       setTags("");
-      setTurnstileToken(null);
       refresh();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Erro ao criar link");
@@ -376,7 +371,7 @@ function LinksView() {
       <Card>
         <CardHeader>
           <CardTitle>Novo link</CardTitle>
-          <CardDescription>Aliases sao globais em prawurl.com.</CardDescription>
+          <CardDescription>Aliases são globais em prawurl.com.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-[1fr_220px_auto]" onSubmit={createLink}>
@@ -385,66 +380,33 @@ function LinksView() {
               <Input id="destination" value={destinationUrl} onChange={(event) => setDestinationUrl(event.target.value)} placeholder="https://..." />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="alias">Alias opcional</Label>
+              <Label htmlFor="alias">
+                Alias <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+              </Label>
               <Input id="alias" value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="minha-url" />
             </div>
             <Button className="self-end" type="submit" disabled={submitting}>
               {submitting ? "Criando" : "Criar"}
             </Button>
             <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="title">Título opcional</Label>
+              <Label htmlFor="title">
+                Título <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+              </Label>
               <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Meu link importante" />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="tags">Tags opcionais</Label>
+              <Label htmlFor="tags">
+                Tags <span className="text-xs font-normal text-muted-foreground">(opcionais)</span>
+              </Label>
               <Input id="tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="portfolio, pessoal" />
             </div>
           </form>
-          <Turnstile onToken={setTurnstileToken} />
           {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
         </CardContent>
       </Card>
       <LinksTable links={links} />
     </section>
   );
-}
-
-function Turnstile({ onToken }: { onToken: (token: string | null) => void }) {
-  const elementId = "prawurl-turnstile";
-
-  useEffect(() => {
-    if (!turnstileSiteKey) {
-      return;
-    }
-
-    const render = () => {
-      const target = document.getElementById(elementId);
-      const turnstile = window.turnstile;
-      if (!target || !turnstile || target.dataset.rendered === "true") {
-        return;
-      }
-      turnstile.render(target, {
-        sitekey: turnstileSiteKey,
-        callback: (token) => onToken(token),
-        "expired-callback": () => onToken(null),
-        "error-callback": () => onToken(null)
-      });
-      target.dataset.rendered = "true";
-    };
-
-    if (!document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')) {
-      const script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-      script.async = true;
-      script.defer = true;
-      script.onload = render;
-      document.head.appendChild(script);
-    } else {
-      render();
-    }
-  }, [onToken]);
-
-  return <div id={elementId} className="mt-4 min-h-16" />;
 }
 
 function AnalyticsView() {
@@ -532,8 +494,8 @@ function UsersTable({ users }: { users: User[] }) {
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.email}</TableCell>
-                <TableCell><Badge>{user.role}</Badge></TableCell>
-                <TableCell>{user.status}</TableCell>
+                <TableCell><Badge>{roleLabel(user.role)}</Badge></TableCell>
+                <TableCell>{userStatusLabel(user.status)}</TableCell>
                 <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
               </TableRow>
             ))}
@@ -604,20 +566,23 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
             {links.map((link) => (
               <TableRow key={link.id}>
                 <TableCell className="font-medium">
-                  <div>prawurl.com/{link.alias}</div>
+                  <div className="flex items-center gap-2">
+                    <span>prawurl.com/{link.alias}</span>
+                    <CopyLinkButton value={`https://prawurl.com/${link.alias}`} />
+                  </div>
                   {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
                 </TableCell>
                 <TableCell className="max-w-xl truncate">{link.destinationUrl}</TableCell>
-                <TableCell><Badge>{link.status}</Badge></TableCell>
+                <TableCell><Badge>{linkStatusLabel(link.status)}</Badge></TableCell>
                 <TableCell>{link.clickCount}</TableCell>
                 <TableCell>
                   <div className="flex max-w-48 flex-wrap gap-1">
-                    {link.tags.map((tag) => (
+                    {link.tags.length > 0 ? link.tags.map((tag) => (
                       <Badge key={tag} className="gap-1">
                         <Tags className="h-3 w-3" />
                         {tag}
                       </Badge>
-                    ))}
+                    )) : <span className="text-xs text-muted-foreground">Sem tags</span>}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -632,19 +597,52 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
   );
 }
 
+function CopyLinkButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copy} aria-label="Copiar link curto">
+      {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+    </Button>
+  );
+}
+
 function QrPreview({ value }: { value: string }) {
   const [src, setSrc] = useState<string>("");
 
   useEffect(() => {
-    QRCode.toDataURL(value, { margin: 1, width: 96, errorCorrectionLevel: "M" })
+    QRCode.toDataURL(value, { margin: 1, width: 320, errorCorrectionLevel: "M" })
       .then(setSrc)
       .catch(() => setSrc(""));
   }, [value]);
 
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-md border bg-background">
-      {src ? <img src={src} alt={`QR Code para ${value}`} className="h-14 w-14" /> : <QrCode className="h-5 w-5 text-muted-foreground" />}
-    </div>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="icon" aria-label="Abrir QR Code">
+          <QrCode className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>QR Code</DialogTitle>
+          <DialogDescription>{value}</DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-center rounded-md border bg-white p-4">
+          {src ? <img src={src} alt={`QR Code para ${value}`} className="h-64 w-64" /> : <QrCode className="h-8 w-8 text-muted-foreground" />}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -668,6 +666,31 @@ function parseTags(value: string): string[] {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .slice(0, 10);
+}
+
+function linkStatusLabel(status: LinkSummary["status"]): string {
+  const labels: Record<LinkSummary["status"], string> = {
+    active: "Ativo",
+    disabled: "Desativado",
+    blocked: "Bloqueado"
+  };
+  return labels[status];
+}
+
+function userStatusLabel(status: User["status"]): string {
+  const labels: Record<User["status"], string> = {
+    active: "Ativo",
+    blocked: "Bloqueado"
+  };
+  return labels[status];
+}
+
+function roleLabel(role: User["role"]): string {
+  const labels: Record<User["role"], string> = {
+    admin: "Admin",
+    user: "Usuário"
+  };
+  return labels[role];
 }
 
 function NavButton({

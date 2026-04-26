@@ -18,7 +18,7 @@ interface Env {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const alias = normalizeAlias(url.pathname.slice(1));
+    const alias = normalizeAlias(url.pathname.replace(/^\/+|\/+$/g, ""));
 
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method not allowed", { status: 405 });

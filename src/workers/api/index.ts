@@ -15,7 +15,6 @@ import {
 import { sha256Hex, randomToken } from "../../infrastructure/crypto";
 import { KvRedirectCache } from "../../infrastructure/kv-redirect-cache";
 import { authorizationUrl, exchangeOAuthCode } from "../../infrastructure/oauth";
-import { verifyTurnstile } from "../../infrastructure/turnstile";
 import type { AppEvent, OAuthProvider, UserStatus, UserRole } from "../../shared/contracts";
 import { ZodError } from "zod";
 
@@ -155,7 +154,6 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   }
 
   if (path === "links" && request.method === "POST") {
-    await verifyTurnstile(env.TURNSTILE_SECRET_KEY, request.headers.get("x-turnstile-token"), request.headers.get("cf-connecting-ip"));
     const link = await services.linkService.create(session.user, await request.json());
     return json({ link }, 201);
   }
