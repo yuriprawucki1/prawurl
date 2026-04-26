@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { PanelLeftIcon } from "lucide-react"
+import { MenuIcon, PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 
 import { cn } from "../../lib/utils"
@@ -255,13 +255,14 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { isMobile, toggleSidebar } = useSidebar()
+  const Icon = isMobile ? MenuIcon : PanelLeftIcon
 
   return (
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
-      variant="ghost"
+      variant={isMobile ? "outline" : "ghost"}
       size="icon-sm"
       className={cn(className)}
       onClick={(event) => {
@@ -270,7 +271,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <PanelLeftIcon className="cn-rtl-flip" />
+      <Icon className="cn-rtl-flip" />
       <span className="sr-only">Alternar sidebar</span>
     </Button>
   )

@@ -58,11 +58,16 @@ import {
 type View = "links" | "analytics" | "admin" | "logs";
 type Theme = "light" | "dark";
 type AdminTab = "users" | "links";
+const themeCookieName = "prawurl_theme";
 
 function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") {
       return "light";
+    }
+    const cookieTheme = readCookie(themeCookieName);
+    if (cookieTheme === "light" || cookieTheme === "dark") {
+      return cookieTheme;
     }
     const stored = window.localStorage.getItem("prawurl-theme");
     if (stored === "light" || stored === "dark") {
@@ -74,9 +79,22 @@ function useTheme() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem("prawurl-theme", theme);
+    writeThemeCookie(theme);
   }, [theme]);
 
   return { theme, toggleTheme: () => setTheme((current) => (current === "dark" ? "light" : "dark")) };
+}
+
+function readCookie(name: string): string | null {
+  return document.cookie
+    .split("; ")
+    .find((item) => item.startsWith(`${name}=`))
+    ?.split("=")[1] ?? null;
+}
+
+function writeThemeCookie(theme: Theme): void {
+  const domain = window.location.hostname.endsWith("prawurl.com") ? "; domain=.prawurl.com" : "";
+  document.cookie = `${themeCookieName}=${theme}; path=/; max-age=31536000; SameSite=Lax${domain}`;
 }
 
 export function App() {
@@ -214,7 +232,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="overflow-x-hidden">
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <div className="flex h-12 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
@@ -278,45 +296,7 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
 
-                <DropdownMenuContent
-                  side="right"
-                  align="end"
-                  sideOffset={8}
-                  className="w-56"
-                >
-                  <DropdownMenuLabel className="grid gap-1">
-                    <span className="truncate text-sm font-medium">
-                      {session.user.name ?? session.user.email}
-                    </span>
-                    <span className="truncate text-xs font-normal text-sidebar-foreground/80">
-                      {session.user.email}
-                    </span>
-                  </DropdownMenuLabel>
-
-                  <DropdownMenuItem onClick={onToggleTheme}>
-                    {theme === "dark" ? (
-                      <Sun className="mr-2 size-4" />
-                    ) : (
-                      <Moon className="mr-2 size-4" />
-                    )}
-
-                    {theme === "dark" ? "Tema claro" : "Tema escuro"}
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={() =>
-                      api.logout().finally(() => {
-                        window.location.href = "https://prawurl.com";
-                      })
-                    }
-                  >
-                    <LogOut className="mr-2 size-4" />
-                    Sair
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
+                <UserMenuContent session={session} theme={theme} onToggleTheme={onToggleTheme} />
               </DropdownMenu>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -326,8 +306,8 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-8 items-center bg-background/95 px-2 backdrop-blur">
-          <SidebarTrigger className="h-6 w-6 p-0 [&_svg]:h-3.5 [&_svg]:w-3.5" />
+        <header className="sticky top-0 z-20 flex h-12 items-center bg-background/95 px-3 backdrop-blur md:h-8 md:px-2">
+          <SidebarTrigger className="h-9 w-9 p-0 md:h-6 md:w-6 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-3.5 md:[&_svg]:w-3.5" />
         </header>
 
         <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 pt-2 md:p-8 md:pt-4">
@@ -343,8 +323,8 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
 
 function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: () => void }) {
   return (
-    <main className="min-h-screen bg-background px-5 py-4 md:px-6 md:py-6">
-      <header className="mx-auto flex max-w-5xl items-center justify-between">
+    <main className="flex h-dvh flex-col overflow-hidden bg-background px-5 py-4 md:px-6 md:py-6">
+      <header className="mx-auto flex w-full max-w-5xl shrink-0 items-center justify-between">
         <Button variant="ghost" onClick={() => (window.location.href = "https://prawurl.com")}>
           <ArrowLeft className="h-4 w-4" />
           Voltar
@@ -352,14 +332,14 @@ function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: ()
         {theme && onToggleTheme && <ThemeToggle theme={theme} onToggle={onToggleTheme} />}
       </header>
 
-      <section className="mx-auto grid min-h-[calc(100vh-4.5rem)] max-w-5xl items-center gap-6 py-4 lg:grid-cols-[1fr_420px]">
+      <section className="mx-auto grid min-h-0 w-full max-w-5xl flex-1 items-center gap-4 py-3 lg:grid-cols-[1fr_420px]">
         <div className="max-w-xl">
-          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground md:h-11 md:w-11">
             <LinkIcon className="h-6 w-6" />
           </div>
-          <Badge className="mb-4 border-primary/20 bg-primary/10 text-primary">PrawURL Workspace</Badge>
-          <h1 className="text-3xl font-semibold tracking-normal md:text-5xl">Entre para gerenciar seus links.</h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
+          <Badge className="mb-3 border-primary/20 bg-primary/10 text-primary">PrawURL Workspace</Badge>
+          <h1 className="text-2xl font-semibold tracking-normal md:text-5xl">Entre para gerenciar seus links.</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground md:text-lg md:leading-8">
             Crie aliases, acompanhe cliques, organize tags e mantenha seus redirects sob controle em um painel simples.
           </p>
         </div>
@@ -378,7 +358,7 @@ function LoginPage({ theme, onToggleTheme }: { theme?: Theme; onToggleTheme?: ()
               <GithubMark className="h-4 w-4" />
               Continuar com GitHub
             </Button>
-            <p className="pt-2 text-xs leading-5 text-muted-foreground">
+            <p className="text-xs leading-5 text-muted-foreground">
               Ao continuar, você aceita usar o PrawURL para criar e auditar links curtos públicos.
             </p>
           </CardContent>
@@ -446,9 +426,6 @@ function LinksView() {
               </Label>
               <Input id="alias" value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="minha-url" />
             </div>
-            <Button className="w-full self-end md:w-auto" type="submit" disabled={submitting}>
-              {submitting ? "Criando" : "Criar"}
-            </Button>
             <div className="grid gap-2 md:col-span-2">
               <Label htmlFor="title">
                 Título <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
@@ -460,6 +437,11 @@ function LinksView() {
                 Tags <span className="text-xs font-normal text-muted-foreground">(opcionais)</span>
               </Label>
               <Input id="tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="portfolio, pessoal" />
+            </div>
+            <div className="flex md:col-span-3 md:justify-end">
+              <Button className="w-full md:w-auto" type="submit" disabled={submitting}>
+                {submitting ? "Criando" : "Criar link"}
+              </Button>
             </div>
           </form>
           {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
@@ -581,6 +563,52 @@ function UsersTable({ users }: { users: User[] }) {
   );
 }
 
+function UserMenuContent({ session, theme, onToggleTheme }: { session: SessionUser; theme: Theme; onToggleTheme: () => void }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  function logout() {
+    api.logout().finally(() => {
+      setOpenMobile(false);
+      window.location.href = "https://prawurl.com";
+    });
+  }
+
+  return (
+    <DropdownMenuContent
+      side={isMobile ? "top" : "right"}
+      align={isMobile ? "start" : "end"}
+      sideOffset={8}
+      className={isMobile ? "w-[calc(100vw-2rem)]" : "w-56"}
+    >
+      <DropdownMenuLabel className="grid gap-1">
+        <span className="truncate text-sm font-medium">
+          {session.user.name ?? session.user.email}
+        </span>
+        <span className="truncate text-xs font-normal text-muted-foreground">
+          {session.user.email}
+        </span>
+      </DropdownMenuLabel>
+
+      <DropdownMenuItem onClick={onToggleTheme}>
+        {theme === "dark" ? (
+          <Sun className="mr-2 size-4" />
+        ) : (
+          <Moon className="mr-2 size-4" />
+        )}
+
+        {theme === "dark" ? "Tema claro" : "Tema escuro"}
+      </DropdownMenuItem>
+
+      <DropdownMenuSeparator />
+
+      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={logout}>
+        <LogOut className="mr-2 size-4" />
+        Sair
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  );
+}
+
 function AuditLogsView() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   useEffect(() => {
@@ -589,17 +617,25 @@ function AuditLogsView() {
 
   return (
     <section className="grid gap-6">
-      <PageTitle title="Auditoria" description="Eventos persistentes de auth, CRUD, admin e segurança." />
+      <PageTitle title="Auditoria" description="Eventos persistentes de autenticação, links, admin e segurança." />
       <Card>
+        <CardHeader>
+          <CardTitle>Eventos recentes</CardTitle>
+          <CardDescription>Use esta visão para entender quem fez o quê, quando e em qual entidade.</CardDescription>
+        </CardHeader>
         <CardContent className="pt-6">
           <div className="grid gap-3 md:hidden">
             {logs.map((log) => (
               <div key={log.id} className="grid gap-2 rounded-md border p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{log.action}</span>
-                  <Badge>{log.severity}</Badge>
+                  <Badge>{severityLabel(log.severity)}</Badge>
                 </div>
-                <div className="text-xs text-muted-foreground">{log.entityType}</div>
+                <div className="grid gap-1 text-xs text-muted-foreground">
+                  <span>Entidade: {log.entityType}{log.entityId ? `/${shortId(log.entityId)}` : ""}</span>
+                  <span>Ator: {log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</span>
+                </div>
+                <AuditMetadata metadata={log.metadata} />
                 <div className="text-xs text-muted-foreground">{new Date(log.occurredAt).toLocaleString()}</div>
               </div>
             ))}
@@ -610,7 +646,9 @@ function AuditLogsView() {
                 <TableRow>
                   <TableHead>Quando</TableHead>
                   <TableHead>Ação</TableHead>
+                  <TableHead>Ator</TableHead>
                   <TableHead>Entidade</TableHead>
+                  <TableHead>Dados</TableHead>
                   <TableHead>Severidade</TableHead>
                 </TableRow>
               </TableHeader>
@@ -619,8 +657,12 @@ function AuditLogsView() {
                   <TableRow key={log.id}>
                     <TableCell>{new Date(log.occurredAt).toLocaleString()}</TableCell>
                     <TableCell>{log.action}</TableCell>
-                    <TableCell>{log.entityType}</TableCell>
-                    <TableCell><Badge>{log.severity}</Badge></TableCell>
+                    <TableCell>{log.actorUserId ? shortId(log.actorUserId) : "Sistema"}</TableCell>
+                    <TableCell>{log.entityType}{log.entityId ? `/${shortId(log.entityId)}` : ""}</TableCell>
+                    <TableCell className="max-w-sm">
+                      <AuditMetadata metadata={log.metadata} />
+                    </TableCell>
+                    <TableCell><Badge>{severityLabel(log.severity)}</Badge></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -656,6 +698,7 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
                 {link.title && <div className="mt-1 text-xs text-muted-foreground">{link.title}</div>}
               </div>
               <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
+              <div className="text-xs text-muted-foreground">Criado por: {link.ownerEmail ?? shortId(link.ownerId)}</div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge>{linkStatusLabel(link.status)}</Badge>
                 <span className="text-xs text-muted-foreground">{link.clickCount} cliques</span>
@@ -675,6 +718,7 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
               <TableRow>
                 <TableHead>Curto</TableHead>
                 <TableHead>Destino</TableHead>
+                <TableHead>Dono</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Cliques</TableHead>
                 <TableHead>Tags</TableHead>
@@ -694,6 +738,7 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
                     {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
                   </TableCell>
                   <TableCell className="max-w-xl truncate">{link.destinationUrl}</TableCell>
+                  <TableCell>{link.ownerEmail ?? shortId(link.ownerId)}</TableCell>
                   <TableCell><Badge>{linkStatusLabel(link.status)}</Badge></TableCell>
                   <TableCell>{link.clickCount}</TableCell>
                   <TableCell>
@@ -810,6 +855,37 @@ function parseTags(value: string): string[] {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .slice(0, 10);
+}
+
+function AuditMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const entries = Object.entries(metadata).filter(([, value]) => value !== undefined && value !== null && value !== "");
+
+  if (entries.length === 0) {
+    return <span className="text-xs text-muted-foreground">Sem metadados</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {entries.map(([key, value]) => (
+        <Badge key={key} className="max-w-full truncate">
+          {key}: {String(value)}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function shortId(value: string): string {
+  return value.length > 10 ? `${value.slice(0, 8)}...` : value;
+}
+
+function severityLabel(severity: AuditLog["severity"]): string {
+  const labels: Record<AuditLog["severity"], string> = {
+    info: "Info",
+    warning: "Atenção",
+    critical: "Crítico"
+  };
+  return labels[severity];
 }
 
 function linkStatusLabel(status: LinkSummary["status"]): string {

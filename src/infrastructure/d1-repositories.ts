@@ -34,6 +34,11 @@ type LinkRow = {
   updated_at: string;
 };
 
+type LinkSummaryRow = LinkRow & {
+  click_count: number;
+  owner_email?: string | null;
+};
+
 type UserRow = {
   id: string;
   email: string;
@@ -107,22 +112,23 @@ export class D1LinkRepository implements LinkRepository {
          ORDER BY l.created_at DESC`
       )
       .bind(ownerId)
-      .all<LinkRow & { click_count: number }>();
-    return (result.results ?? []).map((row) => ({ ...mapLink(row), clickCount: row.click_count }));
+      .all<LinkSummaryRow>();
+    return (result.results ?? []).map(mapLinkSummary);
   }
 
   async listAll(): Promise<LinkSummary[]> {
     const result = await this.db
       .prepare(
-        `SELECT l.*, COUNT(c.id) AS click_count
+        `SELECT l.*, u.email AS owner_email, COUNT(c.id) AS click_count
          FROM links l
+         INNER JOIN users u ON u.id = l.owner_id
          LEFT JOIN click_events c ON c.link_id = l.id
-         GROUP BY l.id
+         GROUP BY l.id, u.email
          ORDER BY l.created_at DESC
          LIMIT 500`
       )
-      .all<LinkRow & { click_count: number }>();
-    return (result.results ?? []).map((row) => ({ ...mapLink(row), clickCount: row.click_count }));
+      .all<LinkSummaryRow>();
+    return (result.results ?? []).map(mapLinkSummary);
   }
 
   async update(id: string, ownerId: string | null, input: Parameters<LinkRepository["update"]>[2], now: string): Promise<Link | null> {
@@ -364,6 +370,14 @@ function mapLink(row: LinkRow): Link {
     redirectCode: row.redirect_code,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function mapLinkSummary(row: LinkSummaryRow): LinkSummary {
+  return {
+    ...mapLink(row),
+    clickCount: row.click_count,
+    ownerEmail: row.owner_email ?? undefined
   };
 }
 

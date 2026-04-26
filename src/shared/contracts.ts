@@ -31,6 +31,7 @@ export interface Link {
 
 export interface LinkSummary extends Link {
   clickCount: number;
+  ownerEmail?: string;
 }
 
 export interface CreateLinkInput {

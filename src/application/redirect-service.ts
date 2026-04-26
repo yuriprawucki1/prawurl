@@ -5,7 +5,7 @@ export class RedirectService {
   constructor(
     private readonly links: LinkRepository,
     private readonly cache: RedirectCache,
-    private readonly events: EventPublisher
+    private readonly events?: EventPublisher
   ) {}
 
   async resolve(alias: string): Promise<RedirectCacheEntry | null> {
@@ -38,7 +38,7 @@ export class RedirectService {
   }
 
   recordClick(event: AppEvent): Promise<void> {
-    return this.events.publish(event);
+    return this.events?.publish(event) ?? Promise.resolve();
   }
 }
 

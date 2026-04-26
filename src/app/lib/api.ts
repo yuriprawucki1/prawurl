@@ -27,7 +27,8 @@ const mockLinks: LinkSummary[] = [
     redirectCode: 302,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    clickCount: 42
+    clickCount: 42,
+    ownerEmail: mockUser.email
   }
 ];
 
@@ -91,7 +92,8 @@ function createMockLink(input: CreateLinkInput): { link: LinkSummary } {
     redirectCode: input.redirectCode ?? 302,
     createdAt: now,
     updatedAt: now,
-    clickCount: 0
+    clickCount: 0,
+    ownerEmail: mockUser.email
   };
   mockLinks.unshift(link);
   return { link };

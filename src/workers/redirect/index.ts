@@ -1,8 +1,7 @@
 import { RedirectService } from "../../application/redirect-service";
-import { D1LinkRepository } from "../../infrastructure/d1-repositories";
+import { D1LinkRepository, insertClickEvent } from "../../infrastructure/d1-repositories";
 import { sha256Hex } from "../../infrastructure/crypto";
 import { KvRedirectCache } from "../../infrastructure/kv-redirect-cache";
-import { QueueEventPublisher } from "../../infrastructure/queue-event-publisher";
 import type { AppEvent } from "../../shared/contracts";
 import { isReservedPath, normalizeAlias } from "../../shared/validation";
 
@@ -30,8 +29,7 @@ export default {
 
     const service = new RedirectService(
       new D1LinkRepository(env.DB),
-      new KvRedirectCache(env.PRAWURL_LINKS),
-      new QueueEventPublisher(env.EVENTS)
+      new KvRedirectCache(env.PRAWURL_LINKS)
     );
     const entry = await service.resolve(alias);
 
@@ -39,19 +37,7 @@ export default {
       return env.ASSETS.fetch(new Request(new URL("/status?missing=1", url), request));
     }
 
-    ctx.waitUntil(
-      service.recordClick({
-        type: "click",
-        linkId: entry.id,
-        alias: entry.alias,
-        occurredAt: new Date().toISOString(),
-        country: request.cf?.country?.toString() ?? null,
-        region: request.cf?.region?.toString() ?? null,
-        referrer: request.headers.get("referer"),
-        userAgent: summarizeUserAgent(request.headers.get("user-agent")),
-        ipHash: await ipHash(request, env)
-      })
-    );
+    ctx.waitUntil(clickEvent(request, env, entry.id, entry.alias).then((event) => insertClickEvent(env.DB, event)));
 
     return new Response(null, {
       status: entry.redirectCode,
@@ -80,4 +66,18 @@ async function ipHash(request: Request, env: Env): Promise<string | null> {
     return null;
   }
   return sha256Hex(`${env.LOG_HASH_SALT}:${ip}`);
+}
+
+async function clickEvent(request: Request, env: Env, linkId: string, alias: string): Promise<Extract<AppEvent, { type: "click" }>> {
+  return {
+    type: "click",
+    linkId,
+    alias,
+    occurredAt: new Date().toISOString(),
+    country: request.cf?.country?.toString() ?? null,
+    region: request.cf?.region?.toString() ?? null,
+    referrer: request.headers.get("referer"),
+    userAgent: summarizeUserAgent(request.headers.get("user-agent")),
+    ipHash: await ipHash(request, env)
+  };
 }
