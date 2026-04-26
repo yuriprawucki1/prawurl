@@ -24,6 +24,7 @@
 - Domínios custom do Pages podem ficar `pending` mesmo depois do CNAME existir; o `pages.dev` do projeto costuma funcionar enquanto a validação/certificado termina.
 - Domínio custom do Worker pode ficar anexado com sucesso e ainda falhar no TLS por alguns minutos; não trocar o frontend para ele antes de `curl https://.../health` responder 200.
 - O frontend de staging deve derivar `api.staging.prawurl.com` do host atual; não reintroduzir `workers.dev` como origem estável no build de staging.
+- O tema global deve ser persistido no domínio raiz do projeto (`.prawurl.com`), para sobreviver entre `staging.prawurl.com` e `app.staging.prawurl.com` sem separar preferências por subdomínio.
 
 ## Notas do projeto
 

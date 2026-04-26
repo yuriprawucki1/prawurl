@@ -42,7 +42,12 @@ export function getCookieDomain(origin: string): string {
     return "";
   }
 
-  return `; domain=.${normalizeSiteHost(hostname)}`;
+  const parts = normalizeSiteHost(hostname).split(".");
+  if (parts.length < 2) {
+    return "";
+  }
+
+  return `; domain=.${parts.slice(-2).join(".")}`;
 }
 
 function normalizeSiteHost(hostname: string): string {
