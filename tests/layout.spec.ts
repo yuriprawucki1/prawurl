@@ -63,6 +63,19 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
   await expectNoGlobalOverflow(page);
   await saveScreenshot(page, "links");
 
+  const listBeforeSelection = await page.locator("[data-testid='links-list']").boundingBox();
+  await page.getByRole("checkbox").first().click();
+  await expect(page.locator("[data-testid='bulk-actions-bar']")).toBeVisible();
+  await expectHorizontallyInsideViewport(page, "[data-testid='bulk-actions-bar']");
+  const listAfterSelection = await page.locator("[data-testid='links-list']").boundingBox();
+  expect(listBeforeSelection).not.toBeNull();
+  expect(listAfterSelection).not.toBeNull();
+  if (listBeforeSelection && listAfterSelection) {
+    expect(Math.abs(listBeforeSelection.y - listAfterSelection.y)).toBeLessThanOrEqual(1);
+  }
+  await saveScreenshot(page, "bulk-actions");
+  await page.getByRole("button", { name: "Limpar seleção" }).click();
+
   await page.getByRole("button", { name: "Novo link" }).click();
   await expect(page.getByRole("heading", { name: "Novo link" })).toBeVisible();
   await page.getByRole("combobox").filter({ hasText: "Sem expiração" }).click();
@@ -85,6 +98,7 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
 
   const actionTrigger = page.locator("button[aria-label='Abrir ações do link']").first();
   if (await actionTrigger.isVisible()) {
+    const scrollXBefore = await page.evaluate(() => window.scrollX);
     const before = await actionTrigger.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return { x: rect.x, y: rect.y };
@@ -98,11 +112,23 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
 
     expect(Math.abs(before.x - after.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+    await expect.poll(() => page.evaluate(() => window.scrollX)).toBe(scrollXBefore);
 
     await expectInsideViewport(page, "[data-slot='dropdown-menu-content']");
     await saveScreenshot(page, "admin-actions");
-    await page.keyboard.press("Escape");
+    await page.getByRole("menuitem", { name: "Editar" }).click();
+  } else {
+    await page.getByRole("button", { name: "Editar" }).first().click();
   }
+
+  await expect(page.getByRole("heading", { name: "Editar link" })).toBeVisible();
+  await expect(page.getByText("Senha definida")).toBeVisible();
+  await page.getByPlaceholder("Adicionar país").first().fill("Portugal");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("PT · Portugal")).toBeVisible();
+  await expectNoGlobalOverflow(page);
+  await saveScreenshot(page, "editor-password-countries");
+  await page.getByRole("button", { name: "Cancelar" }).click();
 
   await openNavigationItem(page, "Auditoria");
   await expect(page.getByRole("heading", { name: "Auditoria" })).toBeVisible();

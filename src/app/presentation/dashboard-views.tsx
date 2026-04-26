@@ -23,7 +23,8 @@ import {
   StarOff,
   Loader2,
   Upload,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import type {
   AuditLog,
@@ -40,6 +41,7 @@ import type {
 } from "../../shared/contracts";
 import { api } from "../lib/api";
 import { resolveOrigins } from "../lib/origins";
+import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { normalizeDestinationUrlInput } from "../../shared/validation";
 import { Badge } from "../components/ui/badge";
@@ -359,33 +361,6 @@ function LinkWorkspace({
           </div>
         </CardHeader>
         <CardContent className="grid min-w-0 gap-4">
-          {selectedIds.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm">
-              <span className="font-medium">{selectedIds.length} selecionados</span>
-              <Button size="sm" variant="outline" onClick={() => toggleStatus(selectedIds, "activate")}>
-                Ativar
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => toggleStatus(selectedIds, "deactivate")}>
-                Desativar
-              </Button>
-              <Button size="sm" variant="outline" onClick={exportSelected}>
-                <Upload className="h-4 w-4" />
-                Exportar
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={async () => {
-                  await bulkAction({ ids: selectedIds, action: "delete" });
-                  setSelectedIds([]);
-                  refresh();
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-                Excluir
-              </Button>
-            </div>
-          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           {loading && links.length === 0 ? (
             <LinksTableSkeleton showOwner={showOwner} hasActions={true} />
@@ -409,6 +384,19 @@ function LinkWorkspace({
           )}
         </CardContent>
       </Card>
+
+      <BulkActionsBar
+        selectedCount={selectedIds.length}
+        onActivate={() => toggleStatus(selectedIds, "activate")}
+        onDeactivate={() => toggleStatus(selectedIds, "deactivate")}
+        onExport={exportSelected}
+        onDelete={async () => {
+          await bulkAction({ ids: selectedIds, action: "delete" });
+          setSelectedIds([]);
+          refresh();
+        }}
+        onClear={() => setSelectedIds([])}
+      />
 
       <LinkEditorDialog
         open={editorOpen}
@@ -553,6 +541,79 @@ function MobileFiltersSheet({
   );
 }
 
+function BulkActionsBar({
+  selectedCount,
+  onActivate,
+  onDeactivate,
+  onExport,
+  onDelete,
+  onClear
+}: {
+  selectedCount: number;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onExport: () => void;
+  onDelete: () => void | Promise<void>;
+  onClear: () => void;
+}) {
+  if (selectedCount === 0) {
+    return null;
+  }
+
+  return (
+    <div className="pointer-events-none fixed inset-x-3 bottom-4 z-40 flex justify-center sm:bottom-6">
+      <div
+        data-testid="bulk-actions-bar"
+        className="pointer-events-auto flex w-full max-w-[min(42rem,calc(100vw-1.5rem))] flex-wrap items-center justify-center gap-2 rounded-lg border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-lg sm:w-fit sm:justify-start"
+      >
+        <div className="flex min-w-0 items-center gap-2 pr-1 font-medium">
+          <Badge className="shrink-0 bg-primary text-primary-foreground">{selectedCount}</Badge>
+          <span className="whitespace-nowrap">selecionado{selectedCount === 1 ? "" : "s"}</span>
+        </div>
+        <Button size="sm" variant="outline" onClick={onActivate}>
+          Ativar
+        </Button>
+        <Button size="sm" variant="outline" onClick={onDeactivate}>
+          Desativar
+        </Button>
+        <Button size="sm" variant="outline" onClick={onExport}>
+          <Upload className="h-4 w-4" />
+          Exportar
+        </Button>
+        <Button size="sm" variant="destructive" onClick={onDelete}>
+          <Trash2 className="h-4 w-4" />
+          Excluir
+        </Button>
+        <Button size="icon-sm" variant="ghost" onClick={onClear} aria-label="Limpar seleção">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function EditorSection({
+  title,
+  icon,
+  children,
+  className
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("grid min-w-0 gap-4 rounded-lg border bg-muted/20 p-4", className)}>
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</div>
+        <h3 className="truncate text-sm font-semibold">{title}</h3>
+      </div>
+      <div className="grid min-w-0 gap-4">{children}</div>
+    </section>
+  );
+}
+
 function LinkEditorDialog({
   open,
   onOpenChange,
@@ -602,135 +663,157 @@ function LinkEditorDialog({
   }
 
   const content = (
-    <form className="grid min-w-0 gap-5" onSubmit={submit}>
-      <div className="grid min-w-0 gap-2">
-        <Label>URL destino</Label>
-        <Input
-          value={form.destinationUrl}
-          onChange={(event) => setForm((current) => ({ ...current, destinationUrl: event.target.value }))}
-          placeholder="https://..."
-          autoCapitalize="none"
-          autoCorrect="off"
-          inputMode="url"
-        />
-      </div>
-      <div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <div className="grid min-w-0 gap-2">
-          <Label>Alias</Label>
-          <Input
-            value={form.alias}
-            onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
-            placeholder="Opcional"
-            disabled={mode === "edit"}
-          />
-        </div>
-        <div className="grid min-w-0 gap-2">
-          <Label>Título</Label>
-          <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
-        </div>
-      </div>
-      <div className="grid min-w-0 gap-2">
-        <Label>Tags</Label>
-        <Input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="portfolio, pessoal" />
-      </div>
-      <div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <div className="grid min-w-0 gap-2">
-          <Label>Senha</Label>
-          <Input
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-            placeholder={mode === "edit" ? "Deixe em branco para manter" : "Opcional"}
-          />
-          {mode === "edit" && hasPassword && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="gap-1">
-                <Lock className="h-3 w-3" />
-                Senha definida
-              </Badge>
-              <Button
-                type="button"
-                variant={form.clearPassword ? "destructive" : "outline"}
-                size="sm"
-                onClick={() => setForm((current) => ({ ...current, clearPassword: !current.clearPassword }))}
-                className="shrink-0"
-              >
-                <Trash2 className="h-4 w-4" />
-                {form.clearPassword ? "Senha será removida" : "Remover senha"}
-              </Button>
+    <form className="grid min-w-0 gap-4" onSubmit={submit}>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="grid min-w-0 gap-4">
+          <EditorSection title="Destino" icon={<LinkIcon className="h-4 w-4" />}>
+            <div className="grid min-w-0 gap-2">
+              <Label>URL destino</Label>
+              <Input
+                value={form.destinationUrl}
+                onChange={(event) => setForm((current) => ({ ...current, destinationUrl: event.target.value }))}
+                placeholder="https://..."
+                autoCapitalize="none"
+                autoCorrect="off"
+                inputMode="url"
+              />
             </div>
-          )}
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-2">
+                <Label>Alias</Label>
+                <Input
+                  value={form.alias}
+                  onChange={(event) => setForm((current) => ({ ...current, alias: event.target.value }))}
+                  placeholder="Opcional"
+                  disabled={mode === "edit"}
+                />
+              </div>
+              <div className="grid min-w-0 gap-2">
+                <Label>Título</Label>
+                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Opcional" />
+              </div>
+            </div>
+            <div className="grid min-w-0 gap-2">
+              <Label>Tags</Label>
+              <Input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="portfolio, pessoal" />
+            </div>
+          </EditorSection>
+
+          <EditorSection title="Proteção" icon={<Lock className="h-4 w-4" />}>
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-2">
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  value={form.password}
+                  onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                  placeholder={mode === "edit" ? "Nova senha (opcional)" : "Opcional"}
+                />
+              </div>
+              <div className="grid min-w-0 gap-2">
+                <Label>Redirect</Label>
+                <Select value={form.redirectCode} onValueChange={(value) => setForm((current) => ({ ...current, redirectCode: value === "301" ? "301" : "302" }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="302 temporário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="302">302 temporário</SelectItem>
+                    <SelectItem value="301">301 permanente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {mode === "edit" && hasPassword && (
+              <div className="grid min-w-0 gap-3 rounded-md border bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <Badge className="w-fit gap-1">
+                  <Lock className="h-3 w-3" />
+                  Senha definida
+                </Badge>
+                <Button
+                  type="button"
+                  variant={form.clearPassword ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => setForm((current) => ({ ...current, clearPassword: !current.clearPassword }))}
+                  className="w-full sm:w-auto"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {form.clearPassword ? "Senha será removida" : "Remover senha"}
+                </Button>
+              </div>
+            )}
+          </EditorSection>
         </div>
-        <div className="grid min-w-0 gap-2">
-          <Label>Redirect</Label>
-          <Select value={form.redirectCode} onValueChange={(value) => setForm((current) => ({ ...current, redirectCode: value === "301" ? "301" : "302" }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="302 temporário" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="302">302 temporário</SelectItem>
-              <SelectItem value="301">301 permanente</SelectItem>
-            </SelectContent>
-          </Select>
+
+        <div className="grid min-w-0 gap-4">
+          <EditorSection title="Regras" icon={<Clock3 className="h-4 w-4" />}>
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-2">
+                <Label>Expiração</Label>
+                <Select value={form.expiresPreset} onValueChange={(value) => setForm((current) => ({ ...current, expiresPreset: value as LinkFormState["expiresPreset"] }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem expiração" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem expiração</SelectItem>
+                    <SelectItem value="1h">Válido por 1 hora</SelectItem>
+                    <SelectItem value="24h">Válido por 24 horas</SelectItem>
+                    <SelectItem value="tomorrow">Válido até amanhã</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid min-w-0 gap-2">
+                <Label>Limite de cliques</Label>
+                <Input type="number" min="1" value={form.clickLimit} onChange={(event) => setForm((current) => ({ ...current, clickLimit: event.target.value }))} />
+              </div>
+              <div className="grid min-w-0 gap-2">
+                <Label>Inatividade (min)</Label>
+                <Input type="number" min="1" value={form.inactiveMinutes} onChange={(event) => setForm((current) => ({ ...current, inactiveMinutes: event.target.value }))} />
+              </div>
+            </div>
+            {form.expiresPreset === "custom" && (
+              <DateTimePickerField
+                date={form.expiresDate}
+                time={form.expiresTime}
+                onChange={(date, time) => setForm((current) => ({ ...current, expiresDate: date, expiresTime: time }))}
+              />
+            )}
+          </EditorSection>
+
+          <EditorSection title="Segmentação" icon={<Shield className="h-4 w-4" />}>
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <CountryMultiSelectField
+                label="Países permitidos"
+                placeholder="Buscar e adicionar países"
+                value={form.countryAllowlist}
+                onChange={(value) => setForm((current) => ({ ...current, countryAllowlist: value }))}
+              />
+              <CountryMultiSelectField
+                label="Países bloqueados"
+                placeholder="Buscar e adicionar países"
+                value={form.countryBlocklist}
+                onChange={(value) => setForm((current) => ({ ...current, countryBlocklist: value }))}
+              />
+            </div>
+          </EditorSection>
+
+          <EditorSection title="Organização" icon={<Star className="h-4 w-4" />}>
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+              <label className="flex min-h-10 items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm">
+                <Checkbox checked={form.favorite} onCheckedChange={(checked) => setForm((current) => ({ ...current, favorite: checked }))} />
+                Favorito
+              </label>
+              <label className="flex min-h-10 items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm">
+                <Checkbox checked={form.pinned} onCheckedChange={(checked) => setForm((current) => ({ ...current, pinned: checked }))} />
+                Fixar no topo
+              </label>
+            </div>
+          </EditorSection>
         </div>
       </div>
-      <div className="grid min-w-0 gap-4 md:grid-cols-3">
-        <div className="grid min-w-0 gap-2">
-          <Label>Expiração</Label>
-          <Select value={form.expiresPreset} onValueChange={(value) => setForm((current) => ({ ...current, expiresPreset: value as LinkFormState["expiresPreset"] }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sem expiração" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sem expiração</SelectItem>
-              <SelectItem value="1h">Válido por 1 hora</SelectItem>
-              <SelectItem value="24h">Válido por 24 horas</SelectItem>
-              <SelectItem value="tomorrow">Válido até amanhã</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid min-w-0 gap-2">
-          <Label>Limite de cliques</Label>
-          <Input type="number" min="1" value={form.clickLimit} onChange={(event) => setForm((current) => ({ ...current, clickLimit: event.target.value }))} />
-        </div>
-        <div className="grid min-w-0 gap-2">
-          <Label>Inatividade (min)</Label>
-          <Input type="number" min="1" value={form.inactiveMinutes} onChange={(event) => setForm((current) => ({ ...current, inactiveMinutes: event.target.value }))} />
-        </div>
-      </div>
-      {form.expiresPreset === "custom" && (
-        <DateTimePickerField
-          date={form.expiresDate}
-          time={form.expiresTime}
-          onChange={(date, time) => setForm((current) => ({ ...current, expiresDate: date, expiresTime: time }))}
-        />
-      )}
-      <div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <CountryMultiSelectField
-          label="Países permitidos"
-          placeholder="Buscar e adicionar países"
-          value={form.countryAllowlist}
-          onChange={(value) => setForm((current) => ({ ...current, countryAllowlist: value }))}
-        />
-        <CountryMultiSelectField
-          label="Países bloqueados"
-          placeholder="Buscar e adicionar países"
-          value={form.countryBlocklist}
-          onChange={(value) => setForm((current) => ({ ...current, countryBlocklist: value }))}
-        />
-      </div>
-      <div className="flex flex-wrap gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={form.favorite} onCheckedChange={(checked) => setForm((current) => ({ ...current, favorite: checked }))} />
-          Favorito
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={form.pinned} onCheckedChange={(checked) => setForm((current) => ({ ...current, pinned: checked }))} />
-          Fixar no topo
-        </label>
-      </div>
-      <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+
+      {formError && <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError}</p>}
+      <div className="flex flex-col-reverse gap-2 border-t pt-3 sm:flex-row sm:justify-end">
         <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
           Cancelar
         </Button>
@@ -738,7 +821,6 @@ function LinkEditorDialog({
           {busy ? "Salvando" : mode === "create" ? "Criar link" : "Salvar alterações"}
         </Button>
       </div>
-      {formError && <p className="text-sm text-destructive">{formError}</p>}
     </form>
   );
 
@@ -758,7 +840,7 @@ function LinkEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Novo link" : "Editar link"}</DialogTitle>
           <DialogDescription>Senha, expiração, país, tags e organização.</DialogDescription>
@@ -933,7 +1015,7 @@ function LinksList({
   }
 
   return (
-    <div className="grid min-w-0 gap-3">
+    <div data-testid="links-list" className="grid min-w-0 gap-3">
       <div className="grid min-w-0 gap-3 md:hidden">
         {links.map((link) => (
           <div key={link.id} className="grid gap-3 overflow-hidden rounded-md border p-3 text-sm">
@@ -965,13 +1047,13 @@ function LinksList({
               )}
               {showOwner && <Badge className="w-fit max-w-full truncate">{link.ownerEmail ?? shortId(link.ownerId)}</Badge>}
             </div>
-            <div className="flex max-h-24 flex-col items-start gap-1 overflow-hidden pr-1">
+            <div className="flex flex-col items-start gap-1 overflow-visible pb-0.5 pr-1">
               {signalLabels(link).slice(0, 3).map((signal) => (
-                <Badge key={signal} className="w-fit max-w-full">
+                <Badge key={signal} className="w-fit max-w-full leading-5">
                   {signal}
                 </Badge>
               ))}
-              {signalLabels(link).length > 3 && <Badge className="w-fit">...</Badge>}
+              {signalLabels(link).length > 3 && <Badge className="w-fit leading-5">...</Badge>}
             </div>
             <div className="flex flex-wrap gap-2">
               {onToggleFavorite && (
@@ -1049,19 +1131,19 @@ function LinksList({
                   </TableCell>
                   <TableCell>{link.clickCount}</TableCell>
                   <TableCell>
-                    <div className="flex max-h-24 max-w-28 flex-col items-start gap-1 overflow-hidden pr-1">
+                    <div className="flex max-w-28 flex-col items-start gap-1 overflow-visible pb-0.5 pr-1">
                       {signalLabels(link).slice(0, 3).map((signal) => (
-                        <Badge key={signal} className="w-fit max-w-full">
+                        <Badge key={signal} className="w-fit max-w-full leading-5">
                           {signal}
                         </Badge>
                       ))}
-                      {signalLabels(link).length > 3 && <Badge className="w-fit">...</Badge>}
+                      {signalLabels(link).length > 3 && <Badge className="w-fit leading-5">...</Badge>}
                     </div>
                   </TableCell>
                   {hasActions && (
                     <TableCell className="whitespace-nowrap px-5">
                       <div className="flex justify-center">
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button size="icon-sm" variant="ghost" aria-label="Abrir ações do link">
                               <MoreVertical className="h-4 w-4" />
@@ -1616,24 +1698,26 @@ function CountryMultiSelectField({
   return (
     <div className="grid min-w-0 gap-2">
       <Label>{label}</Label>
-      <div className="rounded-md border bg-background p-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="min-h-11 rounded-md border bg-background px-2 py-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {selected.map((code) => {
             const item = suggestionMap.get(code);
             return (
-              <Badge key={code} className="inline-flex max-w-full items-center gap-1 self-start pr-1.5">
+              <Badge key={code} className="inline-flex h-7 max-w-full items-center gap-1 pr-1">
                 <span className="truncate">
                   {code}
                   {item ? ` · ${item.label}` : ""}
                 </span>
-                <button
+                <Button
                   type="button"
-                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="ml-0.5 h-5 w-5 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
                   onClick={() => removeCountry(code)}
                   aria-label={`Remover ${code}`}
                 >
-                  ×
-                </button>
+                  <X className="h-3 w-3" />
+                </Button>
               </Badge>
             );
           })}
@@ -1642,7 +1726,7 @@ function CountryMultiSelectField({
             onChange={(event) => setQuery(event.target.value.toUpperCase())}
             onKeyDown={handleKeyDown}
             placeholder={selected.length === 0 ? placeholder : "Adicionar país"}
-            className="min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-sm outline-none placeholder:text-muted-foreground"
+            className="h-7 min-w-28 flex-1 border-0 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
             autoCapitalize="characters"
             autoCorrect="off"
           />
