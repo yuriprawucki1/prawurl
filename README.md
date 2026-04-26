@@ -131,8 +131,7 @@ Target URLs:
 
 - `https://staging.prawurl.com`
 - `https://app.staging.prawurl.com`
-- `https://prawurl-api-staging.yuriprawucki1.workers.dev`
-- `https://api.staging.prawurl.com` is reserved as the custom hostname and may lag behind while SSL finishes provisioning.
+- `https://api.staging.prawurl.com`
 
 GitHub Actions secrets for staging:
 
@@ -174,15 +173,12 @@ These are the URLs currently used by staging:
 
 - Public origin: `https://staging.prawurl.com`
 - App origin: `https://app.staging.prawurl.com`
-- API origin: `https://prawurl-api-staging.yuriprawucki1.workers.dev`
-- Custom API hostname reserved for later: `https://api.staging.prawurl.com`
+- API origin: `https://api.staging.prawurl.com`
 
 Use these callback URLs in the OAuth providers:
 
-- Google callback: `https://prawurl-api-staging.yuriprawucki1.workers.dev/auth/google/callback`
-- GitHub callback: `https://prawurl-api-staging.yuriprawucki1.workers.dev/auth/github/callback`
-
-If the custom hostname is already stable in Cloudflare, you can also add the equivalent callbacks under `https://api.staging.prawurl.com/auth/.../callback`.
+- Google callback: `https://api.staging.prawurl.com/auth/google/callback`
+- GitHub callback: `https://api.staging.prawurl.com/auth/github/callback`
 
 ### How to create each secret
 

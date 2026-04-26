@@ -23,7 +23,7 @@ export function resolveOrigins(location: Pick<Location, "hostname" | "origin" | 
 
   const publicOrigin = import.meta.env.VITE_PUBLIC_ORIGIN ?? buildOrigin(location.protocol, publicHost);
   const appOrigin = import.meta.env.VITE_APP_ORIGIN ?? (appHost ? buildOrigin(location.protocol, appHost) : publicOrigin);
-  const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "https://api.prawurl.com";
+  const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? (apiHost ? buildOrigin(location.protocol, apiHost) : "https://api.prawurl.com");
 
   return {
     publicOrigin,

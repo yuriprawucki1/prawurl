@@ -16,16 +16,17 @@
 
 - Separar a UI em módulos pequenos quando `presentation/app.tsx` começa a concentrar roteamento, shell e views.
 - Centralizar origens e nomes de ambiente em uma camada única para remover hardcodes espalhados.
-- Para staging de Workers, `workers.dev` pode servir como endpoint HTTPS funcional antes do hostname customizado terminar de provisionar.
+- Para staging de Workers, `workers.dev` pode servir como fallback temporário de diagnóstico antes do hostname customizado terminar de provisionar.
 - Promover código de staging para produção por merge de `staging` em `main`, mantendo `main` como a branch que publica produção.
 - Quando os `STAGING_*` do GitHub Actions não existem, o workflow grava string vazia nos secrets do Worker; conferir os segredos antes de investigar login quebrado.
-- Os callbacks OAuth de staging seguem o `VITE_API_ORIGIN` do deploy; hoje o valor confiável é o endpoint `workers.dev` enquanto o hostname customizado fica pronto.
+- Os callbacks OAuth de staging devem apontar para `https://api.staging.prawurl.com`; se o host ainda não responder, aguardar o TLS do domínio terminar de propagar.
 - Se o botão `Run workflow` não aparecer para staging, disparar um novo push na branch `staging`; workflows que ainda não vivem na `main` podem não aparecer na UI de Actions.
 - Domínios custom do Pages podem ficar `pending` mesmo depois do CNAME existir; o `pages.dev` do projeto costuma funcionar enquanto a validação/certificado termina.
 - Domínio custom do Worker pode ficar anexado com sucesso e ainda falhar no TLS por alguns minutos; não trocar o frontend para ele antes de `curl https://.../health` responder 200.
+- O frontend de staging deve derivar `api.staging.prawurl.com` do host atual; não reintroduzir `workers.dev` como origem estável no build de staging.
 
 ## Notas do projeto
 
 - O staging usa recursos Cloudflare próprios: API Worker, Redirect Worker, Pages, D1, KV e Queue separados da produção.
-- A saúde do staging da API depende de um endpoint HTTPS válido; o custom hostname pode atrasar, então `workers.dev` é o fallback confiável.
+- A saúde do staging da API depende de `https://api.staging.prawurl.com`; se o TLS ainda não respondeu, usar `workers.dev` só como fallback temporário de diagnóstico.
 - O workflow de staging usa secrets próprios do ambiente para a aplicação, e compartilha apenas o token do Cloudflare no GitHub Actions.
