@@ -1,6 +1,6 @@
 import type { LinkSafetyStatus } from "../shared/contracts";
 
-export const LINK_PASSWORD_ITERATIONS = 150_000;
+export const LINK_PASSWORD_ITERATIONS = 100_000;
 export const LINK_UNLOCK_COOKIE_TTL_SECONDS = 15 * 60;
 
 const encoder = new TextEncoder();

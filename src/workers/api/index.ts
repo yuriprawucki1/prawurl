@@ -103,9 +103,22 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   const publicResolve = path.match(/^public\/resolve\/(.+)$/);
   if (publicResolve && request.method === "GET") {
     const alias = normalizeAlias(decodeURIComponent(publicResolve[1]).replace(/^\/+|\/+$/g, ""));
-    return json(
-      await resolvePublicAlias(request, env, services.redirectService, alias, now)
-    );
+    const result = await resolvePublicAlias(request, env, services.redirectService, alias, now);
+    if (result.kind === "redirect") {
+      ctx.waitUntil(
+        insertClickEvent(env.DB, {
+          linkId: result.linkId ?? null,
+          alias,
+          occurredAt: now,
+          country: request.cf?.country?.toString() ?? null,
+          region: request.cf?.region?.toString() ?? null,
+          referrer: request.headers.get("referer"),
+          userAgent: summarizeUserAgent(request.headers.get("user-agent")),
+          ipHash: null
+        })
+      );
+    }
+    return json(result);
   }
 
   const publicUnlock = path.match(/^public\/resolve\/(.+)\/unlock$/);
@@ -442,6 +455,7 @@ function publicResolution(result: Awaited<ReturnType<RedirectService["resolve"]>
   if (result.kind === "redirect") {
     return {
       kind: "redirect" as const,
+      linkId: result.linkId,
       destinationUrl: result.destinationUrl,
       redirectCode: result.redirectCode,
       alias: result.alias

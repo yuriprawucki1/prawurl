@@ -134,6 +134,7 @@ export interface BlockedDomainEntry {
 export interface PublicLinkResolution {
   kind: "redirect" | "password_required" | "blocked" | "not_found";
   alias?: string;
+  linkId?: string;
   title?: string | null;
   destinationUrl?: string;
   redirectCode?: 301 | 302;

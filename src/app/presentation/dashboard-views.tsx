@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import QRCode from "qrcode";
 import {
   ArrowUpDown,
@@ -9,11 +9,14 @@ import {
   Lock,
   Pin,
   PinOff,
+  PencilLine,
   Plus,
   Search,
   Shield,
   Tags,
   Trash2,
+  Star,
+  StarOff,
   Upload,
   Users
 } from "lucide-react";
@@ -39,9 +42,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
 
 type AdminTab = "users" | "links" | "blocklist";
 type EditorMode = "create" | "edit";
@@ -269,13 +274,23 @@ function LinkWorkspace({
   const [editingLink, setEditingLink] = useState<LinkSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   const refresh = useCallback(() => {
-    setLoading(true);
+    if (hasLoadedRef.current) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     loadLinks(filters)
       .then(({ links: nextLinks }) => setLinks(nextLinks))
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Erro ao carregar links."))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        hasLoadedRef.current = true;
+        setLoading(false);
+        setRefreshing(false);
+      });
   }, [filters, loadLinks]);
 
   useEffect(() => {
@@ -403,24 +418,27 @@ function LinkWorkspace({
             </div>
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {loading ? (
+          {loading && links.length === 0 ? (
             <div className="rounded-md border p-6 text-sm text-muted-foreground">Carregando links...</div>
           ) : (
-            <LinksList
-              links={links}
-              showOwner={showOwner}
-              selectedIds={selectedIds}
-              onToggleSelected={(id) =>
-                setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
-              }
-              onEdit={(link) => {
-                setEditingLink(link);
-                setEditorOpen(true);
-              }}
-              onDelete={removeLink}
-              onToggleFavorite={toggleFavorite}
-              onTogglePinned={togglePinned}
-            />
+            <div className="grid gap-3">
+              {refreshing && <div className="text-xs text-muted-foreground">Atualizando links sem interromper a visualização.</div>}
+              <LinksList
+                links={links}
+                showOwner={showOwner}
+                selectedIds={selectedIds}
+                onToggleSelected={(id) =>
+                  setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
+                }
+                onEdit={(link) => {
+                  setEditingLink(link);
+                  setEditorOpen(true);
+                }}
+                onDelete={removeLink}
+                onToggleFavorite={toggleFavorite}
+                onTogglePinned={togglePinned}
+              />
+            </div>
           )}
         </CardContent>
       </Card>
@@ -458,25 +476,27 @@ function FiltersBar({
       />
       <Input placeholder="Domínio" value={filters.domain ?? ""} onChange={(event) => onChange({ ...filters, domain: event.target.value || undefined })} />
       <Input placeholder="Tag" value={filters.tag ?? ""} onChange={(event) => onChange({ ...filters, tag: event.target.value || undefined })} />
-      <select
-        className="h-10 rounded-md border bg-background px-3 text-sm"
-        value={filters.status ?? ""}
-        onChange={(event) => onChange({ ...filters, status: parseStatus(event.target.value) })}
-      >
-        <option value="">Todos os status</option>
-        <option value="active">Ativo</option>
-        <option value="disabled">Desativado</option>
-        <option value="blocked">Bloqueado</option>
-      </select>
-      <select
-        className="h-10 rounded-md border bg-background px-3 text-sm"
-        value={filters.favorite === undefined ? "" : filters.favorite ? "1" : "0"}
-        onChange={(event) => onChange({ ...filters, favorite: parseBooleanFilter(event.target.value) })}
-      >
-        <option value="">Todos</option>
-        <option value="1">Favoritos</option>
-        <option value="0">Não favoritos</option>
-      </select>
+      <Select value={filters.status ?? "all"} onValueChange={(value) => onChange({ ...filters, status: value === "all" ? undefined : parseStatus(value) })}>
+        <SelectTrigger>
+          <SelectValue placeholder="Todos os status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos os status</SelectItem>
+          <SelectItem value="active">Ativo</SelectItem>
+          <SelectItem value="disabled">Desativado</SelectItem>
+          <SelectItem value="blocked">Bloqueado</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={filters.favorite === undefined ? "all" : filters.favorite ? "1" : "0"} onValueChange={(value) => onChange({ ...filters, favorite: value === "all" ? undefined : value === "1" })}>
+        <SelectTrigger>
+          <SelectValue placeholder="Todos" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos</SelectItem>
+          <SelectItem value="1">Favoritos</SelectItem>
+          <SelectItem value="0">Não favoritos</SelectItem>
+        </SelectContent>
+      </Select>
       <Button variant="outline" onClick={() => onChange({})}>
         <ArrowUpDown className="h-4 w-4" />
         Limpar
@@ -510,25 +530,27 @@ function MobileFiltersSheet({
             <Input placeholder="Buscar por slug ou destino" value={filters.search ?? ""} onChange={(event) => onChange({ ...filters, search: event.target.value || undefined })} />
             <Input placeholder="Domínio" value={filters.domain ?? ""} onChange={(event) => onChange({ ...filters, domain: event.target.value || undefined })} />
             <Input placeholder="Tag" value={filters.tag ?? ""} onChange={(event) => onChange({ ...filters, tag: event.target.value || undefined })} />
-            <select
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-              value={filters.status ?? ""}
-              onChange={(event) => onChange({ ...filters, status: parseStatus(event.target.value) })}
-            >
-              <option value="">Todos os status</option>
-              <option value="active">Ativo</option>
-              <option value="disabled">Desativado</option>
-              <option value="blocked">Bloqueado</option>
-            </select>
-            <select
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-              value={filters.favorite === undefined ? "" : filters.favorite ? "1" : "0"}
-              onChange={(event) => onChange({ ...filters, favorite: parseBooleanFilter(event.target.value) })}
-            >
-              <option value="">Todos</option>
-              <option value="1">Favoritos</option>
-              <option value="0">Não favoritos</option>
-            </select>
+            <Select value={filters.status ?? "all"} onValueChange={(value) => onChange({ ...filters, status: value === "all" ? undefined : parseStatus(value) })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="active">Ativo</SelectItem>
+                <SelectItem value="disabled">Desativado</SelectItem>
+                <SelectItem value="blocked">Bloqueado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.favorite === undefined ? "all" : filters.favorite ? "1" : "0"} onValueChange={(value) => onChange({ ...filters, favorite: value === "all" ? undefined : value === "1" })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="1">Favoritos</SelectItem>
+                <SelectItem value="0">Não favoritos</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={() => onChange({})}>
               Limpar filtros
             </Button>
@@ -606,30 +628,32 @@ function LinkEditorDialog({
         </div>
         <div className="grid gap-2">
           <Label>Redirect</Label>
-          <select
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-            value={form.redirectCode}
-            onChange={(event) => setForm((current) => ({ ...current, redirectCode: event.target.value === "301" ? "301" : "302" }))}
-          >
-            <option value="302">302 temporário</option>
-            <option value="301">301 permanente</option>
-          </select>
+          <Select value={form.redirectCode} onValueChange={(value) => setForm((current) => ({ ...current, redirectCode: value === "301" ? "301" : "302" }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="302 temporário" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="302">302 temporário</SelectItem>
+              <SelectItem value="301">301 permanente</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div className="grid gap-2 md:grid-cols-3">
         <div className="grid gap-2">
           <Label>Expiração</Label>
-          <select
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-            value={form.expiresPreset}
-            onChange={(event) => setForm((current) => ({ ...current, expiresPreset: event.target.value as LinkFormState["expiresPreset"] }))}
-          >
-            <option value="none">Sem expiração</option>
-            <option value="1h">Válido por 1 hora</option>
-            <option value="24h">Válido por 24 horas</option>
-            <option value="tomorrow">Válido até amanhã</option>
-            <option value="custom">Personalizado</option>
-          </select>
+          <Select value={form.expiresPreset} onValueChange={(value) => setForm((current) => ({ ...current, expiresPreset: value as LinkFormState["expiresPreset"] }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sem expiração" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem expiração</SelectItem>
+              <SelectItem value="1h">Válido por 1 hora</SelectItem>
+              <SelectItem value="24h">Válido por 24 horas</SelectItem>
+              <SelectItem value="tomorrow">Válido até amanhã</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="grid gap-2">
           <Label>Limite de cliques</Label>
@@ -679,8 +703,8 @@ function LinkEditorDialog({
 
   if (isMobile) {
     return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{mode === "create" ? "Novo link" : "Editar link"}</SheetTitle>
             <SheetDescription>Senha, expiração, país, tags e organização.</SheetDescription>
@@ -693,7 +717,7 @@ function LinkEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Novo link" : "Editar link"}</DialogTitle>
           <DialogDescription>Senha, expiração, país, tags e organização.</DialogDescription>
@@ -723,6 +747,8 @@ function LinksList({
   onToggleFavorite?: (link: LinkSummary) => void;
   onTogglePinned?: (link: LinkSummary) => void;
 }) {
+  const hasActions = Boolean(onEdit || onDelete || onToggleFavorite || onTogglePinned);
+
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 md:hidden">
@@ -740,7 +766,7 @@ function LinksList({
               </label>
               <div className="flex items-center gap-1">
                 <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
-                {onEdit && <MiniActionButton icon={<Plus className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
+                {onEdit && <MiniActionButton icon={<PencilLine className="h-4 w-4" />} label="Editar" onClick={() => onEdit(link)} />}
               </div>
             </div>
             <div className="break-all text-xs text-muted-foreground">{link.destinationUrl}</div>
@@ -786,82 +812,111 @@ function LinksList({
       </div>
 
       <div className="hidden md:block">
-        <Table className="min-w-[1200px]">
-          <TableHeader>
-            <TableRow>
-              {onToggleSelected && <TableHead className="w-10" />}
-              <TableHead>Curto</TableHead>
-              <TableHead>Destino</TableHead>
-              {showOwner && <TableHead>Dono</TableHead>}
-              <TableHead>Status</TableHead>
-              <TableHead>Cliques</TableHead>
-              <TableHead>Sinais</TableHead>
-              <TableHead>Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {links.map((link) => (
-              <TableRow key={link.id}>
-                {onToggleSelected && (
-                  <TableCell>
-                    <input checked={selectedIds.includes(link.id)} onChange={() => onToggleSelected(link.id)} type="checkbox" />
-                  </TableCell>
-                )}
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <a className="text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
-                      {publicHostname}/{link.alias}
-                    </a>
-                    <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
-                  </div>
-                  {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
-                </TableCell>
-                <TableCell className="max-w-xl truncate">{link.destinationUrl}</TableCell>
-                {showOwner && <TableCell>{link.ownerEmail ?? shortId(link.ownerId)}</TableCell>}
-                <TableCell>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge>{linkStatusLabel(link.status)}</Badge>
-                    {link.passwordProtected && <Badge><Lock className="mr-1 h-3 w-3" />Senha</Badge>}
-                  </div>
-                </TableCell>
-                <TableCell>{link.clickCount}</TableCell>
-                <TableCell>
-                  <div className="flex max-w-64 flex-wrap gap-1">
-                    {link.favorite && <Badge>Favorito</Badge>}
-                    {link.pinned && <Badge>Fixado</Badge>}
-                    {link.safetyStatus !== "clean" && <Badge>{link.safetyStatus}</Badge>}
-                    {link.countryAllowlist.length > 0 && <Badge>+{link.countryAllowlist.join(",")}</Badge>}
-                    {link.countryBlocklist.length > 0 && <Badge>-{link.countryBlocklist.join(",")}</Badge>}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-2">
-                    {onEdit && (
-                      <Button size="sm" variant="outline" onClick={() => onEdit(link)}>
-                        Editar
-                      </Button>
-                    )}
-                    {onToggleFavorite && (
-                      <Button size="sm" variant="outline" onClick={() => onToggleFavorite(link)}>
-                        {link.favorite ? "Desfavoritar" : "Favoritar"}
-                      </Button>
-                    )}
-                    {onTogglePinned && (
-                      <Button size="sm" variant="outline" onClick={() => onTogglePinned(link)}>
-                        {link.pinned ? "Desafixar" : "Fixar"}
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button size="sm" variant="destructive" onClick={() => onDelete(link.id)}>
-                        Excluir
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+        <div className="overflow-x-auto rounded-md border">
+          <Table className="w-full table-fixed">
+            <TableHeader>
+              <TableRow>
+                {onToggleSelected && <TableHead className="w-10" />}
+                <TableHead className="w-[18rem]">Curto</TableHead>
+                <TableHead>Destino</TableHead>
+                {showOwner && <TableHead className="w-[12rem]">Dono</TableHead>}
+                <TableHead className="w-28">Status</TableHead>
+                <TableHead className="w-24">Cliques</TableHead>
+                <TableHead className="w-[14rem]">Sinais</TableHead>
+                {hasActions && <TableHead className="w-40">Ações</TableHead>}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {links.map((link) => (
+                <TableRow key={link.id}>
+                  {onToggleSelected && (
+                    <TableCell>
+                      <input checked={selectedIds.includes(link.id)} onChange={() => onToggleSelected(link.id)} type="checkbox" />
+                    </TableCell>
+                  )}
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <a className="text-primary underline-offset-4 hover:underline" href={`${publicOrigin}/${link.alias}`} target="_blank" rel="noreferrer">
+                        {publicHostname}/{link.alias}
+                      </a>
+                      <CopyLinkButton value={`${publicOrigin}/${link.alias}`} />
+                    </div>
+                    {link.title && <div className="text-xs font-normal text-muted-foreground">{link.title}</div>}
+                  </TableCell>
+                  <TableCell className="truncate">{link.destinationUrl}</TableCell>
+                  {showOwner && <TableCell className="truncate">{link.ownerEmail ?? shortId(link.ownerId)}</TableCell>}
+                  <TableCell>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge>{linkStatusLabel(link.status)}</Badge>
+                      {link.passwordProtected && (
+                        <Badge>
+                          <Lock className="mr-1 h-3 w-3" />
+                          Senha
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{link.clickCount}</TableCell>
+                  <TableCell>
+                    <div className="flex max-w-64 flex-wrap gap-1">
+                      {link.favorite && <Badge>Favorito</Badge>}
+                      {link.pinned && <Badge>Fixado</Badge>}
+                      {link.safetyStatus !== "clean" && <Badge>{link.safetyStatus}</Badge>}
+                      {link.countryAllowlist.length > 0 && <Badge>+{link.countryAllowlist.join(",")}</Badge>}
+                      {link.countryBlocklist.length > 0 && <Badge>-{link.countryBlocklist.join(",")}</Badge>}
+                    </div>
+                  </TableCell>
+                  {hasActions && (
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {onEdit && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon-sm" variant="ghost" onClick={() => onEdit(link)} aria-label="Editar link">
+                                <PencilLine className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {onToggleFavorite && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon-sm" variant="ghost" onClick={() => onToggleFavorite(link)} aria-label={link.favorite ? "Desfavoritar link" : "Favoritar link"}>
+                                {link.favorite ? <StarOff className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{link.favorite ? "Desfavoritar" : "Favoritar"}</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {onTogglePinned && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon-sm" variant="ghost" onClick={() => onTogglePinned(link)} aria-label={link.pinned ? "Desafixar link" : "Fixar link"}>
+                                {link.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{link.pinned ? "Desafixar" : "Fixar"}</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {onDelete && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon-sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(link.id)} aria-label="Excluir link">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Excluir</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
@@ -1014,9 +1069,14 @@ function CopyLinkButton({ value }: { value: string }) {
   }
 
   return (
-    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copy} aria-label="Copiar link curto">
-      {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copy} aria-label="Copiar link curto">
+          {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{copied ? "Copiado" : "Copiar link"}</TooltipContent>
+    </Tooltip>
   );
 }
 
