@@ -157,3 +157,60 @@ npm run deploy:api:staging
 npm run deploy:redirect:staging
 npm run deploy:web:staging
 ```
+
+### Staging checklist
+
+Use this order when bootstrapping staging secrets:
+
+1. Create the GitHub Actions secrets.
+2. Create OAuth apps for Google and GitHub.
+3. Copy the client IDs and client secrets into the matching `STAGING_*` secrets.
+4. Generate fresh random values for session and hash secrets.
+5. Re-run the staging workflow so Wrangler writes the secrets into the staging Workers.
+
+### Staging URLs and origins
+
+These are the URLs currently used by staging:
+
+- Public origin: `https://staging.prawurl.com`
+- App origin: `https://app.staging.prawurl.com`
+- API origin: `https://prawurl-api-staging.yuriprawucki1.workers.dev`
+- Custom API hostname reserved for later: `https://api.staging.prawurl.com`
+
+Use these callback URLs in the OAuth providers:
+
+- Google callback: `https://prawurl-api-staging.yuriprawucki1.workers.dev/auth/google/callback`
+- GitHub callback: `https://prawurl-api-staging.yuriprawucki1.workers.dev/auth/github/callback`
+
+If the custom hostname is already stable in Cloudflare, you can also add the equivalent callbacks under `https://api.staging.prawurl.com/auth/.../callback`.
+
+### How to create each secret
+
+- `STAGING_SESSION_SECRET`: generate a long random string.
+  - Example: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- `STAGING_LOG_HASH_SALT`: generate another long random string.
+  - Example: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- `STAGING_GOOGLE_CLIENT_ID` and `STAGING_GOOGLE_CLIENT_SECRET`:
+  - Create or open a Google OAuth Client in Google Cloud Console.
+  - Add the Google callback URL above to the authorized redirect URIs.
+  - Copy the client ID and client secret.
+- `STAGING_OAUTH_GITHUB_CLIENT_ID` and `STAGING_OAUTH_GITHUB_CLIENT_SECRET`:
+  - Create or open a GitHub OAuth App.
+  - Set the callback URL to the GitHub callback above.
+  - Copy the client ID and client secret.
+
+### GitHub Actions secrets to add
+
+Create these in the repository settings under Secrets and variables > Actions:
+
+- `CLOUDFLARE_API_TOKEN`
+- `STAGING_SESSION_SECRET`
+- `STAGING_GOOGLE_CLIENT_ID`
+- `STAGING_GOOGLE_CLIENT_SECRET`
+- `STAGING_OAUTH_GITHUB_CLIENT_ID`
+- `STAGING_OAUTH_GITHUB_CLIENT_SECRET`
+- `STAGING_LOG_HASH_SALT`
+
+### Reminder
+
+If a `STAGING_*` secret is missing, the workflow currently writes an empty value to the Worker secret bulk upload. That can make login or redirects fail in staging.

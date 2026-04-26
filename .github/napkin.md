@@ -18,6 +18,8 @@
 - Centralizar origens e nomes de ambiente em uma camada única para remover hardcodes espalhados.
 - Para staging de Workers, `workers.dev` pode servir como endpoint HTTPS funcional antes do hostname customizado terminar de provisionar.
 - Promover código de staging para produção por merge de `staging` em `main`, mantendo `main` como a branch que publica produção.
+- Quando os `STAGING_*` do GitHub Actions não existem, o workflow grava string vazia nos secrets do Worker; conferir os segredos antes de investigar login quebrado.
+- Os callbacks OAuth de staging seguem o `VITE_API_ORIGIN` do deploy; hoje o valor confiável é o endpoint `workers.dev` enquanto o hostname customizado fica pronto.
 
 ## Notas do projeto
 
