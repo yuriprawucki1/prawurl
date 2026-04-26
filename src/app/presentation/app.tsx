@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type * as React from "react";
 import {
   Activity,
@@ -377,11 +377,31 @@ function LinksView() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const refresh = () => api.links().then(({ links }) => setLinks(links)).catch((error) => setError(error instanceof Error ? error.message : "Erro ao carregar links."));
+  const refresh = useCallback(() => {
+    api.links()
+      .then(({ links }) => setLinks(links))
+      .catch((error) => setError(error instanceof Error ? error.message : "Erro ao carregar links."));
+  }, []);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (!document.hidden) {
+        refresh();
+      }
+    };
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refresh]);
 
   async function createLink(event: React.FormEvent) {
     event.preventDefault();
@@ -415,7 +435,7 @@ function LinksView() {
           <CardDescription>Aliases são globais em prawurl.com.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-[1fr_220px_auto]" onSubmit={createLink}>
+          <form className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_220px]" onSubmit={createLink}>
             <div className="grid gap-2">
               <Label htmlFor="destination">URL destino</Label>
               <Input id="destination" value={destinationUrl} onChange={(event) => setDestinationUrl(event.target.value)} placeholder="https://..." />
@@ -426,19 +446,19 @@ function LinksView() {
               </Label>
               <Input id="alias" value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="minha-url" />
             </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="title">
-                Título <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-              </Label>
-              <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Meu link importante" />
-            </div>
             <div className="grid gap-2">
               <Label htmlFor="tags">
                 Tags <span className="text-xs font-normal text-muted-foreground">(opcionais)</span>
               </Label>
               <Input id="tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="portfolio, pessoal" />
             </div>
-            <div className="flex md:col-span-3 md:justify-end">
+            <div className="grid gap-2 md:col-span-2">
+              <Label htmlFor="title">
+                Título <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+              </Label>
+              <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Meu link importante" />
+            </div>
+            <div className="flex md:items-end md:justify-end">
               <Button className="w-full md:w-auto" type="submit" disabled={submitting}>
                 {submitting ? "Criando" : "Criar link"}
               </Button>
@@ -454,9 +474,30 @@ function LinksView() {
 
 function AnalyticsView() {
   const [links, setLinks] = useState<LinkSummary[]>([]);
-  useEffect(() => {
+  const refresh = useCallback(() => {
     api.links().then(({ links }) => setLinks(links));
   }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (!document.hidden) {
+        refresh();
+      }
+    };
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refresh]);
+
   const totalClicks = useMemo(() => links.reduce((sum, link) => sum + link.clickCount, 0), [links]);
 
   return (
@@ -578,18 +619,18 @@ function UserMenuContent({ session, theme, onToggleTheme }: { session: SessionUs
       side={isMobile ? "top" : "right"}
       align={isMobile ? "start" : "end"}
       sideOffset={8}
-      className={isMobile ? "w-[calc(100vw-2rem)]" : "w-56"}
+      className={isMobile ? "w-[calc(100vw-2rem)] p-2" : "w-56"}
     >
-      <DropdownMenuLabel className="grid gap-1">
-        <span className="truncate text-sm font-medium">
+      <DropdownMenuLabel className={isMobile ? "grid gap-1.5 px-2 py-3" : "grid gap-1"}>
+        <span className="block truncate text-sm font-medium">
           {session.user.name ?? session.user.email}
         </span>
-        <span className="truncate text-xs font-normal text-muted-foreground">
+        <span className="block break-all text-xs font-normal text-muted-foreground" x-apple-data-detectors="false">
           {session.user.email}
         </span>
       </DropdownMenuLabel>
 
-      <DropdownMenuItem onClick={onToggleTheme}>
+      <DropdownMenuItem className={isMobile ? "py-3 text-base" : undefined} onClick={onToggleTheme}>
         {theme === "dark" ? (
           <Sun className="mr-2 size-4" />
         ) : (
@@ -601,7 +642,7 @@ function UserMenuContent({ session, theme, onToggleTheme }: { session: SessionUs
 
       <DropdownMenuSeparator />
 
-      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={logout}>
+      <DropdownMenuItem className={isMobile ? "py-3 text-base text-destructive focus:text-destructive" : "text-destructive focus:text-destructive"} onClick={logout}>
         <LogOut className="mr-2 size-4" />
         Sair
       </DropdownMenuItem>

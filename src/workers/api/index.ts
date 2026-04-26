@@ -99,6 +99,17 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
       return json({ error: "NOT_FOUND" }, 404);
     }
 
+    ctx.waitUntil(insertClickEvent(env.DB, {
+      linkId: link.id,
+      alias: link.alias,
+      occurredAt: new Date().toISOString(),
+      country: request.cf?.country?.toString() ?? null,
+      region: request.cf?.region?.toString() ?? null,
+      referrer: request.headers.get("referer"),
+      userAgent: summarizeUserAgent(request.headers.get("user-agent")),
+      ipHash: null
+    }));
+
     return json({ destinationUrl: link.destinationUrl });
   }
 
@@ -326,6 +337,13 @@ function assertState(request: Request, state: string | null): void {
 
 function trimPath(pathname: string): string {
   return pathname.replace(/^\/+|\/+$/g, "");
+}
+
+function summarizeUserAgent(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  return value.slice(0, 240);
 }
 
 function json(body: unknown, status = 200, headers?: HeadersInit): Response {
