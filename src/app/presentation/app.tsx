@@ -3,23 +3,19 @@ import type * as React from "react";
 import {
   Activity,
   BarChart3,
-  BookOpen,
-  Building2,
   ChevronsUpDown,
   Command,
   Github,
   LayoutDashboard,
   LinkIcon,
   Lock,
-  LogOut,
   Moon,
-  PanelLeft,
   QrCode,
-  Settings,
   Shield,
   Sun,
   Tags,
-  Users
+  Users,
+  LogOut
 } from "lucide-react";
 import QRCode from "qrcode";
 import { api, authUrl, turnstileSiteKey } from "../lib/api";
@@ -30,10 +26,33 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton } from "../components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "../components/ui/sidebar";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 
-type View = "links" | "analytics" | "admin" | "logs" | "settings";
+type View = "links" | "analytics" | "admin" | "logs";
 type Theme = "light" | "dark";
 type AdminTab = "users" | "links";
 
@@ -133,7 +152,6 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
   const [session, setSession] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("links");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     api
@@ -151,80 +169,138 @@ function DashboardApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: (
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar collapsed={sidebarCollapsed}>
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-3 rounded-md p-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Building2 className="h-5 w-5" />
-            </div>
-            <div className={sidebarCollapsed ? "sr-only" : "min-w-0"}>
-              <div className="font-semibold">PrawURL</div>
-              <div className="text-xs text-muted-foreground">Workspace</div>
-            </div>
-            {!sidebarCollapsed && <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground" />}
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {!sidebarCollapsed && <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Plataforma</div>}
           <SidebarMenu>
-            <NavButton active={view === "links"} onClick={() => setView("links")} icon={<LinkIcon />}>
-              {!sidebarCollapsed && "Links"}
-            </NavButton>
-            <NavButton active={view === "analytics"} onClick={() => setView("analytics")} icon={<BarChart3 />}>
-              {!sidebarCollapsed && "Analytics"}
-            </NavButton>
-            {session.user.role === "admin" && (
-              <>
-                <NavButton active={view === "admin"} onClick={() => setView("admin")} icon={<Shield />}>
-                  {!sidebarCollapsed && "Admin"}
-                </NavButton>
-                <NavButton active={view === "logs"} onClick={() => setView("logs")} icon={<Command />}>
-                  {!sidebarCollapsed && "Auditoria"}
-                </NavButton>
-              </>
-            )}
-            <NavButton active={false} onClick={() => undefined} icon={<BookOpen />}>
-              {!sidebarCollapsed && "Documentação"}
-            </NavButton>
-            <NavButton active={false} onClick={() => undefined} icon={<Settings />}>
-              {!sidebarCollapsed && "Configurações"}
-            </NavButton>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <LinkIcon className="size-4" />
+                </div>
+
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">PrawURL</span>
+                  <span className="truncate text-xs text-muted-foreground">Encurtador de URLs</span>
+                </div>
+
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
+        </SidebarHeader>
+
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <NavButton active={view === "links"} onClick={() => setView("links")} icon={<LinkIcon />}>
+                  Links
+                </NavButton>
+
+                <NavButton active={view === "analytics"} onClick={() => setView("analytics")} icon={<BarChart3 />}>
+                  Analytics
+                </NavButton>
+
+                {session.user.role === "admin" && (
+                  <>
+                    <NavButton active={view === "admin"} onClick={() => setView("admin")} icon={<Shield />}>
+                      Admin
+                    </NavButton>
+
+                    <NavButton active={view === "logs"} onClick={() => setView("logs")} icon={<Command />}>
+                      Auditoria
+                    </NavButton>
+                  </>
+                )}
+
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         </SidebarContent>
+
         <SidebarFooter>
-          <div className="mb-3 flex items-center gap-3 rounded-md bg-muted p-2">
-            <Avatar user={session.user} />
-            <div className={sidebarCollapsed ? "sr-only" : "min-w-0 flex-1"}>
-              <div className="truncate text-sm font-medium">{session.user.name ?? session.user.email}</div>
-              <div className="truncate text-xs text-muted-foreground">{session.user.email}</div>
-            </div>
-            {!sidebarCollapsed && <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />}
-          </div>
-          <div className="grid gap-2">
-            <ThemeToggle theme={theme} onToggle={onToggleTheme} collapsed={sidebarCollapsed} />
-            <Button variant="outline" className="w-full" onClick={() => setSidebarCollapsed((value) => !value)}>
-              <PanelLeft className="h-4 w-4" />
-              {!sidebarCollapsed && "Recolher"}
-            </Button>
-          </div>
-          <Button
-            variant="outline"
-            className="mt-2 w-full"
-            onClick={() => api.logout().finally(() => (window.location.href = "https://prawurl.com"))}
-          >
-            <LogOut className="h-4 w-4" />
-            {!sidebarCollapsed && "Sair"}
-          </Button>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton size="lg">
+                    <Avatar user={session.user} />
+
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-medium">
+                        {session.user.name ?? session.user.email}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {session.user.email}
+                      </span>
+                    </div>
+
+                    <ChevronsUpDown className="ml-auto size-4" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  side="right"
+                  align="end"
+                  sideOffset={8}
+                  className="w-56"
+                >
+                  <DropdownMenuLabel className="grid gap-1">
+                    <span className="truncate text-sm font-medium">
+                      {session.user.name ?? session.user.email}
+                    </span>
+                    <span className="truncate text-xs font-normal text-muted-foreground">
+                      {session.user.email}
+                    </span>
+                  </DropdownMenuLabel>
+
+                  <DropdownMenuItem onClick={onToggleTheme}>
+                    {theme === "dark" ? (
+                      <Sun className="mr-2 size-4" />
+                    ) : (
+                      <Moon className="mr-2 size-4" />
+                    )}
+
+                    {theme === "dark" ? "Tema claro" : "Tema escuro"}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() =>
+                      api.logout().finally(() => {
+                        window.location.href = "https://prawurl.com";
+                      })
+                    }
+                  >
+                    <LogOut className="mr-2 size-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
+
+        <SidebarRail />
       </Sidebar>
-      <main className="min-w-0 flex-1 overflow-x-hidden p-6 md:p-8">
-        {view === "links" && <LinksView />}
-        {view === "analytics" && <AnalyticsView />}
-        {view === "admin" && session.user.role === "admin" && <AdminView />}
-        {view === "logs" && session.user.role === "admin" && <AuditLogsView />}
-      </main>
-    </div>
+
+      <SidebarInset>
+        <header className="flex h-14 items-center gap-2 border-b px-4">
+          <SidebarTrigger />
+          <div className="text-sm font-medium">Dashboard</div>
+        </header>
+
+        <main className="min-w-0 flex-1 overflow-x-hidden p-6 md:p-8">
+          {view === "links" && <LinksView />}
+          {view === "analytics" && <AnalyticsView />}
+          {view === "admin" && session.user.role === "admin" && <AdminView />}
+          {view === "logs" && session.user.role === "admin" && <AuditLogsView />}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
@@ -594,12 +670,22 @@ function parseTags(value: string): string[] {
     .slice(0, 10);
 }
 
-function NavButton({ icon, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: React.ReactElement; active?: boolean }) {
+function NavButton({
+  icon,
+  children,
+  active,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: React.ReactElement;
+  active?: boolean;
+}) {
   return (
-    <SidebarMenuButton {...props}>
-      {icon}
-      {children}
-    </SidebarMenuButton>
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} {...props}>
+        {icon}
+        <span>{children}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
@@ -656,7 +742,7 @@ function StatusPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () 
   );
 }
 
-function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void; collapsed?: boolean }) {
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
   return (
     <Button variant="outline" size="icon" onClick={onToggle} aria-label="Alternar tema">
       {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
