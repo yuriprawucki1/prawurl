@@ -131,9 +131,12 @@ Target URLs:
 
 - `https://staging.prawurl.com`
 - `https://app.staging.prawurl.com`
-- `https://api.staging.prawurl.com`
+- `https://prawurl-api-staging.yuriprawucki1.workers.dev`
+- `https://api.staging.prawurl.com` is reserved as the custom hostname and may lag behind while SSL finishes provisioning.
 
 GitHub Actions secrets for staging:
+
+`CLOUDFLARE_API_TOKEN` is shared for deploy auth; the app secrets below are kept under `STAGING_*`.
 
 ```text
 STAGING_SESSION_SECRET
@@ -143,6 +146,8 @@ STAGING_OAUTH_GITHUB_CLIENT_ID
 STAGING_OAUTH_GITHUB_CLIENT_SECRET
 STAGING_LOG_HASH_SALT
 ```
+
+After validating changes in `staging`, promote them to production by merging `staging` into `main` through a pull request. Production deploys still run from `main`.
 
 To deploy staging locally or from CI:
 
