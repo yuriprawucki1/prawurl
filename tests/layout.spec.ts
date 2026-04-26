@@ -147,9 +147,17 @@ test("estados principais permanecem alinhados em desktop e mobile", async ({ pag
   await page.getByRole("button", { name: /Proteção/ }).click();
   await expect(page.getByText("Senha definida").last()).toBeVisible();
   await page.getByRole("button", { name: /Segmentação/ }).click();
-  await page.getByPlaceholder("Adicionar país").first().fill("Portugal");
+  const countryInput = page.getByTestId("country-select-input").first();
+  if (test.info().project.name === "mobile") {
+    const fontSize = await countryInput.evaluate((element) => Number.parseFloat(window.getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(16);
+  }
+  await countryInput.fill("Portugal");
   await page.keyboard.press("Enter");
   await expect(page.getByText("PT · Portugal")).toBeVisible();
+  await countryInput.fill("Angola");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("AO · Angola")).toBeVisible();
   await expectNoGlobalOverflow(page);
   await saveScreenshot(page, "editor-password-countries");
   await page.getByRole("button", { name: "Cancelar" }).click();
