@@ -1,0 +1,75 @@
+name: Auditoria de dependências
+
+on:
+  pull_request:
+  push:
+    branches: ["main", "staging"]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    name: Auditar dependências npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Instalar dependências sem scripts
+        run: npm ci --include=dev --ignore-scripts --no-audit
+
+      - name: Instalar Syft e Grype com checksum
+        env:
+          SYFT_VERSION: "1.51.1"
+          GRYPE_VERSION: "0.118.0"
+        run: |
+          set -euo pipefail
+          tools_dir="$RUNNER_TEMP/anchore/bin"
+          mkdir -p "$tools_dir"
+          for tool in syft grype; do
+            if [ "$tool" = "syft" ]; then
+              version="$SYFT_VERSION"
+              expected_sha256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
+            else
+              version="$GRYPE_VERSION"
+              expected_sha256="1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2"
+            fi
+            archive="${tool}_${version}_linux_amd64.tar.gz"
+            base="https://github.com/anchore/$tool/releases/download/v$version"
+            curl --fail --silent --show-error --location --retry 3 --retry-all-errors "$base/$archive" --output "$RUNNER_TEMP/$archive"
+            printf '%s  %s\n' "$expected_sha256" "$RUNNER_TEMP/$archive" | sha256sum --check --status
+            tar -xzf "$RUNNER_TEMP/$archive" -C "$tools_dir"
+            test -x "$tools_dir/$tool"
+          done
+          echo "$tools_dir" >> "$GITHUB_PATH"
+
+      - name: Atualizar banco do Grype
+        run: |
+          set -euo pipefail
+          grype db update
+          grype db status
+
+      - name: Gerar SBOM do lockfile
+        run: syft scan file:package-lock.json -o cyclonedx-json="$RUNNER_TEMP/prawurl-lock.sbom.json"
+
+      - name: Auditar SBOM do lockfile
+        run: grype sbom:"$RUNNER_TEMP/prawurl-lock.sbom.json" --fail-on low
+
+      - name: Gerar SBOM da árvore instalada
+        run: syft scan dir:. --exclude './.git/**' --exclude './dist/**' -o cyclonedx-json="$RUNNER_TEMP/prawurl-tree.sbom.json"
+
+      - name: Auditar SBOM da árvore instalada
+        run: grype sbom:"$RUNNER_TEMP/prawurl-tree.sbom.json" --fail-on low
+
+      - name: Executar auditoria npm
+        run: npm audit --audit-level=low
