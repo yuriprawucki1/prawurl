@@ -686,7 +686,7 @@ function statusForError(error: unknown): number {
   if (message === "FORBIDDEN" || message === "USER_BLOCKED") return 403;
   if (message.endsWith("_NOT_FOUND")) return 404;
   if (message.includes("TAKEN") || message.includes("RESERVED")) return 409;
-  if (message.includes("INVALID") || message.includes("BLOCKED") || message.includes("MISSING")) return 400;
+  if (message.includes("INVALID") || message.includes("BLOCKED") || message.includes("MISSING") || message.includes("UNVERIFIED")) return 400;
   return 500;
 }
 
