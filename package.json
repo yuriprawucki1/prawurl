@@ -43,7 +43,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260904.1",
     "@playwright/test": "^1.59.1",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.5.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
