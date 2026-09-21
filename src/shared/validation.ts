@@ -106,7 +106,7 @@ export const bulkLinkActionSchema = z.object({
 });
 
 export const exportLinkSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1).max(100
+  ids: z.array(z.string().min(1)).min(1).max(100)
 });
 
 export const blockedDomainInputSchema = blockedDomainSchema;
