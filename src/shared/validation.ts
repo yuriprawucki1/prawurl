@@ -35,7 +35,7 @@ export const destinationUrlSchema = z.string().trim().transform((value, ctx) => 
   } catch (error) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: error instanceof Error ? error.message : "Use uma URL válida ou informe apenas uma URL válida ou informe apenas o domínio."
+      message: error instanceof Error ? error.message : "Use uma URL válida ou informe apenas o domínio."
     });
     return z.NEVER;
   }
@@ -106,7 +106,7 @@ export const bulkLinkActionSchema = z.object({
 });
 
 export const exportLinkSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1).max(100)
+  ids: z.array(z.string().min(1)).min(1).max(100
 });
 
 export const blockedDomainInputSchema = blockedDomainSchema;
