@@ -27,6 +27,12 @@ describe("UrlPolicy", () => {
     await expect(new UrlPolicy(new MemoryBlockedDomains([])).validate("https://example.com/a")).resolves.toBe("https://example.com/a");
   });
 
+  it("canonicalizes trailing-dot hostnames before applying policy", async () => {
+    const policy = new UrlPolicy(new MemoryBlockedDomains(["bad.test"]));
+    await expect(policy.validate("https://bad.test./path")).rejects.toThrow("DESTINATION_BLOCKED");
+    await expect(policy.validate("https://prawurl.com./path")).rejects.toThrow("DESTINATION_SELF_REFERENTIAL");
+  });
+
   it("rejects self-referential and blocked destinations", async () => {
     await expect(new UrlPolicy(new MemoryBlockedDomains([])).validate("https://prawurl.com/test")).rejects.toThrow("DESTINATION_SELF_REFERENTIAL");
     await expect(new UrlPolicy(new MemoryBlockedDomains(["bad.test"])).validate("https://bad.test")).rejects.toThrow("DESTINATION_BLOCKED");
