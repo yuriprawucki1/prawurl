@@ -1,0 +1,79 @@
+name: Validação compartilhada
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: Ambiente do build (staging ou production)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VITE_API_ORIGIN: ${{ inputs.target == 'staging' && 'https://api.staging.prawurl.com' || 'https://api.prawurl.com' }}
+  VITE_PUBLIC_ORIGIN: ${{ inputs.target == 'staging' && 'https://staging.prawurl.com' || 'https://prawurl.com' }}
+  VITE_APP_ORIGIN: ${{ inputs.target == 'staging' && 'https://app.staging.prawurl.com' || 'https://app.prawurl.com' }}
+
+jobs:
+  verify:
+    name: Qualidade e segurança
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Preparar Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Instalar dependências sem scripts
+        run: npm ci --include=dev --ignore-scripts --no-audit
+
+      - name: Instalar Chromium do Playwright
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: Testar regras do fluxo de publicação
+        run: node --test scripts/ci/*.test.mjs
+
+      - name: Validar novas migrações e preservar as já aplicadas
+        env:
+          MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/ci/check-migrations.mjs
+
+      - name: Auditar dependências e código
+        uses: ./.github/actions/audit-dependencies
+
+      - name: Validar tipos
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Rodar testes unitários
+        run: npm test
+
+      - name: Validar bundles dos Workers
+        run: npm run build:workers
+
+      - name: Rodar testes visuais
+        run: xvfb-run -a npm run test:visual
+
+      - name: Validar jornadas com API e D1 locais
+        run: xvfb-run -a npm run test:e2e
+
+      - name: Guardar frontend validado para publicação
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7

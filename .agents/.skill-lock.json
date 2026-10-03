@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "skills": {
+    "playwright-skill": {
+      "name": "playwright-skill",
+      "source": "local",
+      "contentHash": "9c45020d33af9ac2d44c89721f154c94bd73b9d8590117597b9a26920ff9cecc",
+      "installedAt": "2026-10-02T23:48:58.820Z",
+      "updatedAt": "2026-10-02T23:48:58.820Z",
+      "agents": [
+        "codex"
+      ],
+      "method": "copy",
+      "global": false
+    },
+    "tlc-spec-lean": {
+      "name": "tlc-spec-lean",
+      "source": "local",
+      "contentHash": "28368cb86a9d441fce24426eb502a39a5e7f9ffe0ad5d682fead2ce76c5b085b",
+      "installedAt": "2026-10-02T23:48:58.877Z",
+      "updatedAt": "2026-10-02T23:48:58.877Z",
+      "agents": [
+        "codex"
+      ],
+      "method": "copy",
+      "global": false
+    }
+  }
+}

@@ -82,7 +82,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: "REQUEST_FAILED" }));
+    const body = await response.json().catch(() => ({ error: "REQUEST_FAILED" })) as { error: string };
     throw new Error(errorLabel(body.error));
   }
 

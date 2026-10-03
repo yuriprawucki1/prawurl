@@ -11,7 +11,7 @@
     "lint": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:visual": "playwright test",
+    "test:visual": "playwright test --config playwright.config.ts",
     "test:visual:ui": "playwright test --ui",
     "playwright:install": "playwright install chromium",
     "wrangler:types": "wrangler types --config wrangler.api.jsonc src/workers/api/worker-configuration.d.ts && wrangler types --config wrangler.redirect.jsonc src/workers/redirect/worker-configuration.d.ts",
@@ -21,38 +21,42 @@
     "deploy:redirect": "wrangler deploy --config wrangler.redirect.jsonc",
     "deploy:redirect:production": "wrangler deploy --config wrangler.redirect.jsonc",
     "deploy:redirect:staging": "wrangler deploy --config wrangler.redirect.jsonc --env staging",
-    "deploy:web": "npm run build && wrangler pages deploy dist --project-name prawurl-web",
-    "deploy:web:production": "wrangler pages deploy dist --project-name prawurl-web",
+    "deploy:web": "npm run build && npm run deploy:web:production",
+    "deploy:web:production": "wrangler pages deploy dist --project-name prawurl-web --branch main",
     "deploy:web:staging": "wrangler pages deploy dist --project-name prawurl-web-staging --branch staging",
     "deploy:production": "npm run build && npm run deploy:api:production && npm run deploy:redirect:production && npm run deploy:web:production",
     "deploy:staging": "npm run build && npm run deploy:api:staging && npm run deploy:redirect:staging && npm run deploy:web:staging",
-    "deploy": "npm run deploy:production"
+    "deploy": "npm run deploy:production",
+    "build:workers": "wrangler deploy --dry-run --env \"\" --config wrangler.api.jsonc --outdir .wrangler/test-bundles/api && wrangler deploy --dry-run --env \"\" --config wrangler.redirect.jsonc --outdir .wrangler/test-bundles/redirect",
+    "test:e2e": "playwright test --config playwright.e2e.config.ts"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^5.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.468.0",
+    "lucide-react": "^1.50.0",
     "qrcode": "^1.5.4",
-    "radix-ui": "^1.4.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwind-merge": "^2.6.1",
-    "zod": "^3.24.1"
+    "radix-ui": "^1.6.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260904.1",
-    "@playwright/test": "^1.59.1",
-    "@types/node": "^22.10.2",
+    "@cloudflare/workers-types": "^5.20261002.1",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.4",
     "@types/qrcode": "^1.5.6",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.5.28",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2",
-    "vite": "^7.3.6",
-    "vitest": "^3.2.6",
-    "wrangler": "^4.0.0"
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.147.0"
+  },
+  "engines": {
+    "node": "^24.0.0 || >=26.0.0"
   }
 }
