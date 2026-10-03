@@ -24,7 +24,7 @@ describe("toolchain obligations", () => {
     expect(workflow).toMatch(/actions\/checkout@[a-f0-9]{40} # v4/);
     expect(workflow).toMatch(/actions\/setup-node@[a-f0-9]{40} # v4/);
     expect(workflow).toContain("playwright install --with-deps chromium");
-    expect(workflow).toContain("run: npm run test:visual");
-    expect(workflow).toContain("run: npm run test:e2e");
+    expect(workflow).toContain("run: xvfb-run -a npm run test:visual");
+    expect(workflow).toContain("run: xvfb-run -a npm run test:e2e");
   });
 });

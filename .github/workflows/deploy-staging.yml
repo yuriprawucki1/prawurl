@@ -109,10 +109,10 @@ jobs:
         run: npm run build:workers
 
       - name: Rodar testes visuais
-        run: npm run test:visual
+        run: xvfb-run -a npm run test:visual
 
       - name: Validar jornadas com API e D1 locais
-        run: npm run test:e2e
+        run: xvfb-run -a npm run test:e2e
 
   deploy:
     name: Publicar em staging
