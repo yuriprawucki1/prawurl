@@ -1,4 +1,4 @@
-name: CI/CD Staging
+name: CD | Staging
 
 on:
   push:
@@ -19,100 +19,11 @@ env:
 
 jobs:
   validate:
-    name: Validar staging antes de publicar
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Preparar Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-          cache: npm
-
-      - name: Instalar dependências sem scripts
-        run: npm ci --include=dev --ignore-scripts --no-audit
-
-      - name: Instalar Chromium do Playwright
-        run: npx --no-install playwright install --with-deps chromium
-
-      - name: Validar migrações com rollback
-        run: |
-          set -euo pipefail
-          if git rev-parse HEAD^ >/dev/null 2>&1; then
-            changed="$(git diff --unified=0 HEAD^ HEAD -- migrations | grep -E '^\+.*\b(DROP|TRUNCATE|DELETE[[:space:]]+FROM|ALTER[[:space:]]+TABLE.*(DROP|RENAME)|UPDATE[[:space:]])\b' || true)"
-            if [ -n "$changed" ]; then
-              echo "Migração potencialmente destrutiva detectada; deploy automático bloqueado."
-              printf '%s\n' "$changed"
-              exit 1
-            fi
-          fi
-
-      - name: Auditar dependências npm
-        run: npm audit --audit-level=low
-
-      - name: Instalar Syft e Grype com checksum
-        env:
-          SYFT_VERSION: "1.51.1"
-          GRYPE_VERSION: "0.118.0"
-        run: |
-          set -euo pipefail
-          tools_dir="$RUNNER_TEMP/anchore/bin"
-          mkdir -p "$tools_dir"
-          for tool in syft grype; do
-            if [ "$tool" = "syft" ]; then
-              version="$SYFT_VERSION"
-              expected_sha256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
-            else
-              version="$GRYPE_VERSION"
-              expected_sha256="1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2"
-            fi
-            archive="${tool}_${version}_linux_amd64.tar.gz"
-            base="https://github.com/anchore/$tool/releases/download/v$version"
-            curl --fail --silent --show-error --location --retry 3 --retry-all-errors "$base/$archive" --output "$RUNNER_TEMP/$archive"
-            printf '%s  %s\n' "$expected_sha256" "$RUNNER_TEMP/$archive" | sha256sum --check --status
-            tar -xzf "$RUNNER_TEMP/$archive" -C "$tools_dir"
-            test -x "$tools_dir/$tool"
-          done
-          echo "$tools_dir" >> "$GITHUB_PATH"
-
-      - name: Atualizar banco do Grype
-        run: |
-          set -euo pipefail
-          grype db update
-          grype db status
-
-      - name: Gerar SBOM do lockfile
-        run: syft scan file:package-lock.json -o cyclonedx-json="$RUNNER_TEMP/prawurl-staging-lock.sbom.json"
-
-      - name: Auditar SBOM do lockfile
-        run: grype sbom:"$RUNNER_TEMP/prawurl-staging-lock.sbom.json" --fail-on low
-
-      - name: Gerar SBOM da árvore instalada
-        run: syft scan dir:. --exclude './.git/**' --exclude './dist/**' --exclude './node_modules/**' -o cyclonedx-json="$RUNNER_TEMP/prawurl-staging-tree.sbom.json"
-
-      - name: Auditar SBOM da árvore instalada
-        run: grype sbom:"$RUNNER_TEMP/prawurl-staging-tree.sbom.json" --fail-on low
-
-      - name: Validar tipos
-        run: npm run lint
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Rodar testes unitários
-        run: npm test
-
-      - name: Validar bundles dos Workers
-        run: npm run build:workers
-
-      - name: Rodar testes visuais
-        run: xvfb-run -a npm run test:visual
-
-      - name: Validar jornadas com API e D1 locais
-        run: xvfb-run -a npm run test:e2e
+    name: Validar staging
+    if: ${{ github.ref == 'refs/heads/staging' }}
+    uses: ./.github/workflows/validate.yml
+    with:
+      target: staging
 
   deploy:
     name: Publicar em staging
@@ -160,8 +71,11 @@ jobs:
           }
           NODE
 
-      - name: Build frontend para publicação
-        run: npm run build
+      - name: Baixar frontend aprovado na validação
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: frontend-${{ github.sha }}
+          path: dist
 
       - name: Aplicar migrações D1 staging
         env:
@@ -247,16 +161,47 @@ jobs:
   rollback:
     name: Rollback automático staging
     needs: [validate, deploy, health]
-    if: ${{ always() && github.event_name == 'push' && needs.validate.result == 'success' && (needs.deploy.result == 'failure' || needs.health.result == 'failure') && github.event.before != '0000000000000000000000000000000000000000' && !contains(github.event.head_commit.message, '[auto-rollback]') }}
+    if: ${{ always() && github.event_name == 'push' && needs.validate.result == 'success' && (needs.deploy.result == 'failure' || needs.health.result == 'failure') && !contains(github.event.head_commit.message, '[auto-rollback]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: write
+      actions: read
     steps:
-      - name: Checkout da versão anterior
+      - name: Checkout para identificar a versão saudável anterior
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.before }}
+          fetch-depth: 0
+
+      - name: Selecionar publicação anterior saudável
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          runs_json="$(gh api "/repos/$REPOSITORY/actions/workflows/deploy-staging.yml/runs?branch=staging&status=success&per_page=100")"
+          target_sha=""
+          while IFS= read -r candidate; do
+            if [ "$candidate" = "$CURRENT_SHA" ]; then
+              continue
+            fi
+            if git merge-base --is-ancestor "$candidate" "$CURRENT_SHA"; then
+              target_sha="$candidate"
+              break
+            fi
+          done < <(printf '%s' "$runs_json" | jq -r '.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch") | .head_sha')
+          if [ -z "$target_sha" ]; then
+            echo "Nenhuma publicação anterior saudável foi encontrada; recuperação automática interrompida."
+            exit 1
+          fi
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout da última versão saudável
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.previous.outputs.target_sha }}
           fetch-depth: 0
 
       - name: Preparar Node
@@ -297,7 +242,7 @@ jobs:
       - name: Registrar rollback exato no staging
         env:
           EXPECTED_CURRENT_SHA: ${{ github.sha }}
-          TARGET_SHA: ${{ github.event.before }}
+          TARGET_SHA: ${{ steps.previous.outputs.target_sha }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail

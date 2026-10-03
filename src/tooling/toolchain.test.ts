@@ -14,17 +14,22 @@ describe("toolchain obligations", () => {
 
   it.each(["deploy.yml", "deploy-staging.yml"])("CI gates precede deployment %s", (file) => {
     const workflow = readFileSync(`.github/workflows/${file}`, "utf8");
-    const firstPublish = workflow.search(/run:.*(?:deploy:|migrations apply)/);
-    expect(firstPublish).toBeGreaterThan(0);
-    for (const command of ["npm ci", "npm run lint", "npm run build", "npm test", "npm run build:workers", "npm run test:visual", "npm run test:e2e"]) {
-      const offset = workflow.indexOf(command);
-      expect(offset, command).toBeGreaterThan(0);
-      expect(offset, command).toBeLessThan(firstPublish);
+    const validation = readFileSync(".github/workflows/validate.yml", "utf8");
+    expect(workflow).toMatch(/validate:[\s\S]*uses: \.\/\.github\/workflows\/validate\.yml/);
+    expect(workflow).toMatch(/deploy:[\s\S]*needs: validate/);
+    expect(workflow).toContain("Baixar frontend aprovado na validação");
+    const commands = ["npm ci", "npm run lint", "npm run build", "npm test", "npm run build:workers", "npm run test:visual", "npm run test:e2e"];
+    let previous = -1;
+    for (const command of commands) {
+      const offset = validation.indexOf(command);
+      expect(offset, command).toBeGreaterThan(previous);
+      previous = offset;
     }
-    expect(workflow).toMatch(/actions\/checkout@[a-f0-9]{40} # v4/);
-    expect(workflow).toMatch(/actions\/setup-node@[a-f0-9]{40} # v4/);
-    expect(workflow).toContain("playwright install --with-deps chromium");
-    expect(workflow).toContain("run: xvfb-run -a npm run test:visual");
-    expect(workflow).toContain("run: xvfb-run -a npm run test:e2e");
+    expect(validation).toMatch(/actions\/checkout@[a-f0-9]{40} # v4/);
+    expect(validation).toMatch(/actions\/setup-node@[a-f0-9]{40} # v4/);
+    expect(validation).toContain("playwright install --with-deps chromium");
+    expect(validation).toContain("run: xvfb-run -a npm run test:visual");
+    expect(validation).toContain("run: xvfb-run -a npm run test:e2e");
+    expect(validation.indexOf("Guardar frontend validado")).toBeGreaterThan(previous);
   });
 });

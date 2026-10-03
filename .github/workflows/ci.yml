@@ -1,56 +1,39 @@
-name: CI
+name: CI | Pull requests
 
 on:
   pull_request:
     branches: ["main", "staging"]
-  push:
-    branches: ["main", "staging"]
-  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-
-env:
-  VITE_API_ORIGIN: ${{ (github.base_ref == 'staging' || github.ref == 'refs/heads/staging') && 'https://api.staging.prawurl.com' || 'https://api.prawurl.com' }}
-  VITE_PUBLIC_ORIGIN: ${{ (github.base_ref == 'staging' || github.ref == 'refs/heads/staging') && 'https://staging.prawurl.com' || 'https://prawurl.com' }}
-  VITE_APP_ORIGIN: ${{ (github.base_ref == 'staging' || github.ref == 'refs/heads/staging') && 'https://app.staging.prawurl.com' || 'https://app.prawurl.com' }}
+  actions: read
 
 jobs:
   verify:
-    name: Testes e build
+    name: Validar alteração
+    uses: ./.github/workflows/validate.yml
+    with:
+      target: ${{ github.base_ref == 'staging' && 'staging' || 'production' }}
+
+  promotion:
+    name: Confirmar promoção de staging
+    if: ${{ github.base_ref == 'main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
+        with:
+          fetch-depth: 0
       - name: Preparar Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
-          cache: npm
-
-      - name: Instalar dependências sem scripts
-        run: npm ci --include=dev --ignore-scripts --no-audit
-
-      - name: Instalar Chromium do Playwright
-        run: npx --no-install playwright install --with-deps chromium
-
-      - name: Auditar dependências npm
-        run: npm audit --audit-level=low
-
-      - name: Validar tipos
-        run: npm run lint
-
-      - name: Rodar testes unitários
-        run: npm test
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Rodar testes visuais
-        run: npm run test:visual
+      - name: Exigir staging publicado e sem alterações exclusivas de main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/verify-staging.mjs

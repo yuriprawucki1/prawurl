@@ -1,0 +1,57 @@
+name: Auditoria de dependências e código
+description: npm audit e Syft/Grype com versões e checksums fixados
+runs:
+  using: composite
+  steps:
+    - name: Instalar Syft e Grype com checksum
+      shell: bash
+      env:
+        SYFT_VERSION: "1.51.1"
+        GRYPE_VERSION: "0.118.0"
+      run: |
+        set -euo pipefail
+        tools_dir="$RUNNER_TEMP/anchore/bin"
+        mkdir -p "$tools_dir"
+        for tool in syft grype; do
+          if [ "$tool" = "syft" ]; then
+            version="$SYFT_VERSION"
+            expected_sha256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
+          else
+            version="$GRYPE_VERSION"
+            expected_sha256="1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2"
+          fi
+          archive="${tool}_${version}_linux_amd64.tar.gz"
+          base="https://github.com/anchore/$tool/releases/download/v$version"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors "$base/$archive" --output "$RUNNER_TEMP/$archive"
+          printf '%s  %s\n' "$expected_sha256" "$RUNNER_TEMP/$archive" | sha256sum --check --status
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$tools_dir"
+          test -x "$tools_dir/$tool"
+        done
+        echo "$tools_dir" >> "$GITHUB_PATH"
+
+    - name: Atualizar banco do Grype
+      shell: bash
+      run: |
+        set -euo pipefail
+        grype db update
+        grype db status
+
+    - name: Gerar SBOM do lockfile
+      shell: bash
+      run: syft scan file:package-lock.json -o cyclonedx-json="$RUNNER_TEMP/prawurl-lock.sbom.json"
+
+    - name: Auditar SBOM do lockfile
+      shell: bash
+      run: grype sbom:"$RUNNER_TEMP/prawurl-lock.sbom.json" --fail-on low
+
+    - name: Gerar SBOM do código do projeto
+      shell: bash
+      run: syft scan dir:. --exclude './.git/**' --exclude './dist/**' --exclude './node_modules/**' --exclude './.wrangler/**' --exclude './test-results/**' --exclude './playwright-report/**' -o cyclonedx-json="$RUNNER_TEMP/prawurl-tree.sbom.json"
+
+    - name: Auditar SBOM do código do projeto
+      shell: bash
+      run: grype sbom:"$RUNNER_TEMP/prawurl-tree.sbom.json" --fail-on low
+
+    - name: Executar auditoria npm
+      shell: bash
+      run: npm audit --audit-level=low

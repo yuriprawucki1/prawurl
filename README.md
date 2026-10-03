@@ -134,6 +134,12 @@ OAuth callback URLs:
 - `https://api.prawurl.com/auth/google/callback`
 - `https://api.prawurl.com/auth/github/callback`
 
+## Release flow
+
+Use a feature branch → PR to `staging` → healthy staging deployment → PR from `staging` to `main` → healthy production deployment.
+
+The workflow names, triggers, validation gates, promotion rules and recovery procedure are documented in [`docs/release-flow.md`](docs/release-flow.md).
+
 ## Deploy
 
 Production deploys run through GitHub Actions on every push to `main`.
@@ -187,7 +193,6 @@ STAGING_GOOGLE_CLIENT_ID
 STAGING_GOOGLE_CLIENT_SECRET
 STAGING_OAUTH_GITHUB_CLIENT_ID
 STAGING_OAUTH_GITHUB_CLIENT_SECRET
-STAGING_SESSION_SECRET
 STAGING_LOG_HASH_SALT
 ```
 
@@ -251,9 +256,8 @@ Create these in the repository settings under Secrets and variables > Actions:
 - `STAGING_GOOGLE_CLIENT_SECRET`
 - `STAGING_OAUTH_GITHUB_CLIENT_ID`
 - `STAGING_OAUTH_GITHUB_CLIENT_SECRET`
-- `STAGING_SESSION_SECRET`
 - `STAGING_LOG_HASH_SALT`
 
 ### Reminder
 
-If a `STAGING_*` secret is missing, the workflow currently writes an empty value to the Worker secret bulk upload. That can make login or redirects fail in staging.
+The workflow checks all required secrets before migrations or publication. If any are missing, deployment stops and lists only their names.

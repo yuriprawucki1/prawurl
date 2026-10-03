@@ -1,4 +1,4 @@
-name: Monitor e recuperação de produção
+name: Produção | Monitor e recuperação
 
 on:
   schedule:
@@ -16,6 +16,7 @@ permissions:
 jobs:
   health:
     name: Monitorar endpoints públicos
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -59,7 +60,7 @@ jobs:
           set -euo pipefail
           git init -q .
           git remote add origin "https://github.com/$REPOSITORY.git"
-          git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" fetch --quiet --depth=50 origin main
+          git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" fetch --quiet origin main
           git checkout --quiet --detach origin/main
           current_sha="$(git rev-parse HEAD)"
           current_subject="$(git log -1 --format=%s)"
@@ -69,8 +70,17 @@ jobs:
             echo "A versão atual já é um rollback automático; não será feito rollback em cadeia."
             exit 0
           fi
-          runs_json="$(gh api "/repos/$REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=20")"
-          target_sha="$(printf '%s' "$runs_json" | jq -r --arg current "$current_sha" '.workflow_runs | map(select(.head_sha != $current)) | sort_by(.created_at) | reverse | .[0].head_sha // empty')"
+          runs_json="$(gh api "/repos/$REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=100")"
+          target_sha=""
+          while IFS= read -r candidate; do
+            if [ "$candidate" = "$current_sha" ]; then
+              continue
+            fi
+            if git merge-base --is-ancestor "$candidate" "$current_sha"; then
+              target_sha="$candidate"
+              break
+            fi
+          done < <(printf '%s' "$runs_json" | jq -r '.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch") | .head_sha')
           if [ -z "$target_sha" ]; then
             echo "Não foi possível identificar uma publicação saudável anterior."
             exit 1
