@@ -23,7 +23,7 @@ jobs:
     name: Confirmar promoção de staging
     if: ${{ github.base_ref == 'main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -36,4 +36,4 @@ jobs:
       - name: Exigir staging publicado e sem alterações exclusivas de main
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/verify-staging.mjs
+        run: node scripts/ci/verify-staging.mjs --wait

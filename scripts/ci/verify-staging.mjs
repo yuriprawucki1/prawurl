@@ -2,6 +2,21 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+function pending(message) {
+  return Object.assign(new Error(message), { pending: true });
+}
+
+export async function waitForStaging(verify, { attempts = 41, pause = () => new Promise((resolve) => setTimeout(resolve, 15000)), log = console.log } = {}) {
+  for (let attempt = 1; ; attempt++) {
+    try { return await verify(); }
+    catch (error) {
+      if (!error.pending || attempt >= attempts) throw error;
+      log(`Aguardando publicação de staging (${attempt}/${attempts - 1}): ${error.message}`);
+      await pause();
+    }
+  }
+}
+
 export async function verifyStaging({ repository, sha, pullRequest, request, treeOf, ancestorOf }) {
   const targetTree = await treeOf(sha);
   if (pullRequest) {
@@ -21,8 +36,9 @@ export async function verifyStaging({ repository, sha, pullRequest, request, tre
     if (pullRequest && run.head_sha !== pullRequest.head.sha) continue;
     if (!pullRequest && (await treeOf(run.head_sha) !== targetTree || !await ancestorOf(run.head_sha, sha))) continue;
     // A newer failing or unfinished deployment of the same version invalidates older evidence.
-    if (run.status !== "completed" || run.conclusion !== "success") {
-      throw new Error(`A publicação desta versão em staging ainda não passou: ${run.html_url}`);
+    if (run.status !== "completed") throw pending(`Publicação em andamento: ${run.html_url}`);
+    if (run.conclusion !== "success") {
+      throw new Error(`A publicação desta versão em staging falhou: ${run.html_url}`);
     }
     const { jobs } = await request(`/repos/${repository}/actions/runs/${run.id}/jobs?per_page=100`);
     for (const name of ["Publicar em staging", "Verificar staging"]) {
@@ -32,7 +48,9 @@ export async function verifyStaging({ repository, sha, pullRequest, request, tre
     }
     return run;
   }
-  throw new Error("Nenhuma publicação saudável em staging corresponde a esta árvore. Publique staging antes de promover para main.");
+  const message = "Nenhuma publicação saudável em staging corresponde a esta árvore. Publique staging antes de promover para main.";
+  if (pullRequest) throw pending(message);
+  throw new Error(message);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -40,7 +58,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const repository = process.env.GITHUB_REPOSITORY;
     const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
     const git = (...args) => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-    const run = await verifyStaging({
+    const options = {
       repository,
       sha: process.env.GITHUB_SHA,
       pullRequest: event.pull_request,
@@ -63,7 +81,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         try { git("merge-base", "--is-ancestor", base, head); return true; }
         catch { return false; }
       }
-    });
+    };
+    const run = process.argv.includes("--wait")
+      ? await waitForStaging(() => verifyStaging(options))
+      : await verifyStaging(options);
     const evidence = `Staging validado e publicado: ${run.head_sha}\n${run.html_url}\n`;
     console.log(evidence);
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, evidence);

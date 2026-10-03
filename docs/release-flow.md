@@ -52,7 +52,7 @@ A action `.github/actions/audit-dependencies` é compartilhada entre validação
 - A execução correspondente de `deploy-staging.yml` precisa estar concluída com sucesso, com publicação e health checks realmente executados.
 - Em produção, o commit publicado em staging precisa ser ancestral de main e ter a mesma árvore de arquivos. A busca considera até 100 execuções recentes.
 
-Se staging ainda estiver executando, aguarde e execute novamente o job de promoção do PR. Um check bloqueado enquanto a publicação está em andamento é esperado; não faça bypass. Se uma execução mais recente da mesma versão falhou, corrija ou reexecute staging antes de tentar promover.
+O check do PR aguarda automaticamente até 10 minutos pela publicação de staging. Se esse limite for ultrapassado, aguarde a conclusão e reexecute o job de promoção; não faça bypass. Se uma execução mais recente da mesma versão falhou, corrija ou reexecute staging antes de tentar promover.
 
 ## Publicação e recuperação
 

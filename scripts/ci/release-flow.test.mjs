@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkMigration, checkChangedMigrations } from "./check-migrations.mjs";
-import { verifyStaging } from "./verify-staging.mjs";
+import { verifyStaging, waitForStaging } from "./verify-staging.mjs";
 
 for (const sql of ["DROP TABLE links;", "DELETE FROM links;", "UPDATE links SET status = 'blocked';", "ALTER TABLE links DROP COLUMN title;", "-- note\n alter table links rename to old_links;"]) {
   test(`bloqueia migração destrutiva: ${sql}`, () => assert.throws(() => checkMigration("A", sql), /destrutiva/));
@@ -38,6 +38,29 @@ test("bloqueia produção se não houver deploy da mesma árvore", async () => a
 test("bloqueia deploy de histórico não integrado", async () => assert.rejects(verifyStaging({ ...setup(), ancestorOf: async () => false }), /Nenhuma publicação/));
 for (const status of ["in_progress", "failure"]) test(`bloqueia staging ainda sem sucesso: ${status}`, async () => {
   const latest = { ...successful, status: status === "failure" ? "completed" : status, conclusion: status === "failure" ? "failure" : null };
-  await assert.rejects(verifyStaging(setup({ runs: [latest, successful] })), /ainda não passou/);
+  await assert.rejects(verifyStaging(setup({ runs: [latest, successful] })), /em andamento|falhou/);
 });
 test("bloqueia workflow verde com deploy ou health check pulados", async () => assert.rejects(verifyStaging(setup({ jobs: [{ name: "Publicar em staging", conclusion: "skipped" }] })), /não confirmou/));
+
+test("aguarda publicação em andamento e aprova quando conclui", async () => {
+  let calls = 0;
+  let pauses = 0;
+  const run = await waitForStaging(async () => {
+    if (++calls < 3) throw Object.assign(new Error("aguarde"), { pending: true });
+    return successful;
+  }, { attempts: 3, pause: async () => { pauses++; }, log: () => {} });
+  assert.equal(run.id, 42);
+  assert.equal(pauses, 2);
+});
+test("não espera nem oculta falhas reais de staging", async () => {
+  await assert.rejects(waitForStaging(async () => { throw new Error("deploy falhou"); }, {
+    pause: async () => { assert.fail("não deveria aguardar falha definitiva"); }
+  }), /deploy falhou/);
+});
+test("espera tem limite e não aprova quando staging continua pendente", async () => {
+  let calls = 0;
+  await assert.rejects(waitForStaging(async () => { calls++; throw Object.assign(new Error("pendente"), { pending: true }); }, {
+    attempts: 2, pause: async () => {}, log: () => {}
+  }), /pendente/);
+  assert.equal(calls, 2);
+});
