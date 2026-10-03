@@ -1,15 +1,14 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: {
     sourcemap: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom"]
-        }
+        manualChunks: (id) => /node_modules\/(react|react-dom)\//.test(id) ? "react" : undefined
       }
     }
   }

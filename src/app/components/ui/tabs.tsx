@@ -14,7 +14,7 @@ export function TabsTrigger({ className, active, ...props }: React.ButtonHTMLAtt
     <button
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-        active && "bg-background text-foreground shadow-sm",
+        active && "bg-background text-foreground shadow-xs",
         className
       )}
       {...props}

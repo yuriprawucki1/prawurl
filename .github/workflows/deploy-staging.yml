@@ -22,10 +22,10 @@ jobs:
       VITE_APP_ORIGIN: https://app.staging.prawurl.com
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Preparar Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: npm
@@ -36,11 +36,23 @@ jobs:
       - name: Validar tipos
         run: npm run lint
 
-      - name: Rodar testes
-        run: npm test
-
       - name: Build frontend
         run: npm run build
+
+      - name: Rodar testes Vitest e Workers locais
+        run: npm test
+
+      - name: Validar bundles dos Workers
+        run: npm run build:workers
+
+      - name: Instalar Chromium para os testes
+        run: npx playwright install --with-deps chromium
+
+      - name: Validar layout desktop e mobile
+        run: xvfb-run -a npm run test:visual
+
+      - name: Validar jornadas com API e D1 locais
+        run: xvfb-run -a npm run test:e2e
 
       - name: Aplicar migrações D1 staging
         run: npx wrangler d1 migrations apply prawurl-staging --remote --config wrangler.api.jsonc --env staging

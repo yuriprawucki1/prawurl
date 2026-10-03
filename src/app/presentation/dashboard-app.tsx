@@ -135,7 +135,7 @@ export function DashboardApp({
           </Sidebar>
 
           <SidebarInset>
-            <header className="sticky top-0 z-20 flex h-12 items-center bg-background/95 px-3 backdrop-blur md:h-8 md:px-2">
+            <header className="sticky top-0 z-20 flex h-12 items-center bg-background/95 px-3 backdrop-blur-sm md:h-8 md:px-2">
               <SidebarTrigger className="h-9 w-9 p-0 md:h-6 md:w-6 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-3.5 md:[&_svg]:w-3.5" />
             </header>
 

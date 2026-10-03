@@ -25,7 +25,7 @@ Created in the connected account:
 Project conventions and UI quality notes live in [`docs/napkin.md`](docs/napkin.md).
 
 ```bash
-npm install
+npm ci
 cp .dev.vars.example .dev.vars
 npm run wrangler:types
 npm run dev
@@ -61,6 +61,40 @@ For visual layout checks across desktop and mobile, install the Playwright brows
 npm run playwright:install
 npm run test:visual
 ```
+
+## Regression checks
+
+Use Node.js 24 LTS or Node.js 26+. Vitest 5 does not support Node.js 25. The dependency versions checked on 2026-10-02 are recorded in
+`.specs/features/dependency-refresh/versions.json`; the lockfile pins the complete installed tree.
+
+```bash
+npm ci
+npm run lint
+npm run build
+npm test -- --reporter=verbose
+npm run build:workers
+npm run playwright:install
+npm run test:visual
+npm run test:e2e
+npm audit --audit-level=high
+node scripts/check-dependencies.mjs
+```
+
+Build before running the complete suite: the asset check and redirect Worker tests use `dist`.
+The Vitest suite includes contracts, policies, services and HTTP tests with actual local D1/KV
+bindings. Its Worker fixtures apply the existing migrations and seed test sessions in a disposable
+local runtime. Temporary configuration directories are removed when the tests finish. No Cloudflare account or production
+secrets are needed for these tests.
+
+`test:visual` preserves the original mocked layout suite. `test:e2e` runs the real frontend against
+a local Worker, checking CRUD, unauthenticated screens, empty/loading/error states, bulk actions, CSV, QR and
+theme persistence at desktop and mobile sizes. Browser windows are visible locally; CI uses Xvfb.
+Ports 4175 (mock layout), 4180 (real frontend) and 4910 (E2E API) must be free. The E2E suites run
+sequentially and reset only their temporary bindings. OAuth/Turnstile provider availability is not
+verified against external services by these local checks.
+
+Tailwind 4 requires Safari 16.4+, Chrome 111+ or Firefox 128+. Automated browser checks currently
+use Chromium with desktop and Pixel 5 viewports.
 
 By default the frontend calls the production API at `https://api.prawurl.com`. To point the frontend to a local API Worker, create `.env.local`:
 

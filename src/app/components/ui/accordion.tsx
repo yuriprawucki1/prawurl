@@ -17,7 +17,7 @@ function AccordionTrigger({ className, children, ...props }: React.ComponentProp
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "flex min-h-14 flex-1 items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180",
+          "flex min-h-14 flex-1 items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold outline-hidden transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180",
           className
         )}
         {...props}

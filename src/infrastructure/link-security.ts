@@ -138,7 +138,7 @@ function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   const pairs = hex.match(/.{1,2}/g) ?? [];
   return new Uint8Array(pairs.map((pair) => Number.parseInt(pair, 16)));
 }

@@ -13,5 +13,6 @@
     "types": ["@cloudflare/workers-types"],
     "noEmit": true
   },
-  "include": ["src/workers", "src/shared", "src/domain", "src/application", "src/infrastructure"]
+  "include": ["src/workers", "src/shared", "src/domain", "src/application", "src/infrastructure"],
+  "exclude": ["src/**/*.test.ts"]
 }

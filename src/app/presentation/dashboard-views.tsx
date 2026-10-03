@@ -1045,7 +1045,7 @@ function DateTimePickerField({
       {isMobile ? (
         <>
           {triggerButton}
-          {open && <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-sm">{pickerPanel}</div>}
+          {open && <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-xs">{pickerPanel}</div>}
         </>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
@@ -1827,13 +1827,13 @@ function CountryMultiSelectField({
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={selected.length === 0 ? placeholder : "Adicionar país"}
-            className="h-8 min-w-28 flex-1 border-0 bg-transparent px-1 text-base outline-none placeholder:text-muted-foreground md:h-7 md:text-sm"
+            className="h-8 min-w-28 flex-1 border-0 bg-transparent px-1 text-base outline-hidden placeholder:text-muted-foreground md:h-7 md:text-sm"
             autoCapitalize="characters"
             autoCorrect="off"
           />
         </div>
         {query.trim() && suggestions.length > 0 && (
-          <div className="mt-2 max-h-52 overflow-auto rounded-md border bg-popover p-1 shadow-sm">
+          <div className="mt-2 max-h-52 overflow-auto rounded-md border bg-popover p-1 shadow-xs">
             {suggestions.map((country) => (
               <button
                 key={country.code}
