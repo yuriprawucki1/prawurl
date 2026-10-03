@@ -9,78 +9,306 @@ concurrency:
   group: prawurl-production
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
+env:
+  VITE_API_ORIGIN: https://api.prawurl.com
+  VITE_PUBLIC_ORIGIN: https://prawurl.com
+  VITE_APP_ORIGIN: https://app.prawurl.com
+
 jobs:
-  deploy:
-    name: Validar e publicar
+  validate:
+    name: Validar antes de publicar
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      VITE_API_ORIGIN: https://api.prawurl.com
-      VITE_PUBLIC_ORIGIN: https://prawurl.com
-      VITE_APP_ORIGIN: https://app.prawurl.com
+    timeout-minutes: 35
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Preparar Node
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: npm
 
-      - name: Instalar dependências
-        run: npm ci
+      - name: Instalar dependências sem scripts
+        run: npm ci --include=dev --ignore-scripts --no-audit
+
+      - name: Instalar Chromium do Playwright
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: Validar migrações com rollback
+        run: |
+          set -euo pipefail
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            changed="$(git diff --unified=0 HEAD^ HEAD -- migrations | grep -E '^\+.*\b(DROP|TRUNCATE|DELETE[[:space:]]+FROM|ALTER[[:space:]]+TABLE.*(DROP|RENAME)|UPDATE[[:space:]])\b' || true)"
+            if [ -n "$changed" ]; then
+              echo "Migração potencialmente destrutiva detectada; deploy automático bloqueado."
+              printf '%s\n' "$changed"
+              exit 1
+            fi
+          fi
+
+      - name: Auditar dependências npm
+        run: npm audit --audit-level=low
+
+      - name: Instalar Syft e Grype com checksum
+        env:
+          SYFT_VERSION: "1.51.1"
+          GRYPE_VERSION: "0.118.0"
+        run: |
+          set -euo pipefail
+          tools_dir="$RUNNER_TEMP/anchore/bin"
+          mkdir -p "$tools_dir"
+          for tool in syft grype; do
+            if [ "$tool" = "syft" ]; then
+              version="$SYFT_VERSION"
+              expected_sha256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
+            else
+              version="$GRYPE_VERSION"
+              expected_sha256="1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2"
+            fi
+            archive="${tool}_${version}_linux_amd64.tar.gz"
+            base="https://github.com/anchore/$tool/releases/download/v$version"
+            curl --fail --silent --show-error --location --retry 3 --retry-all-errors "$base/$archive" --output "$RUNNER_TEMP/$archive"
+            printf '%s  %s\n' "$expected_sha256" "$RUNNER_TEMP/$archive" | sha256sum --check --status
+            tar -xzf "$RUNNER_TEMP/$archive" -C "$tools_dir"
+            test -x "$tools_dir/$tool"
+          done
+          echo "$tools_dir" >> "$GITHUB_PATH"
+
+      - name: Atualizar banco do Grype
+        run: |
+          set -euo pipefail
+          grype db update
+          grype db status
+
+      - name: Gerar SBOM do lockfile
+        run: syft scan file:package-lock.json -o cyclonedx-json="$RUNNER_TEMP/prawurl-lock.sbom.json"
+
+      - name: Auditar SBOM do lockfile
+        run: grype sbom:"$RUNNER_TEMP/prawurl-lock.sbom.json" --fail-on low
+
+      - name: Gerar SBOM da árvore instalada
+        run: syft scan dir:. --exclude './.git/**' --exclude './dist/**' -o cyclonedx-json="$RUNNER_TEMP/prawurl-tree.sbom.json"
+
+      - name: Auditar SBOM da árvore instalada
+        run: grype sbom:"$RUNNER_TEMP/prawurl-tree.sbom.json" --fail-on low
 
       - name: Validar tipos
         run: npm run lint
 
+      - name: Rodar testes unitários
+        run: npm test
+
       - name: Build frontend
         run: npm run build
 
-      - name: Rodar testes Vitest e Workers locais
-        run: npm test
+      - name: Rodar testes visuais
+        run: npm run test:visual
 
-      - name: Validar bundles dos Workers
-        run: npm run build:workers
+  deploy:
+    name: Publicar em produção
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Instalar Chromium para os testes
-        run: npx playwright install --with-deps chromium
+      - name: Preparar Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
 
-      - name: Validar layout desktop e mobile
-        run: xvfb-run -a npm run test:visual
+      - name: Instalar dependências sem scripts
+        run: npm ci --include=dev --ignore-scripts --no-audit
 
-      - name: Validar jornadas com API e D1 locais
-        run: xvfb-run -a npm run test:e2e
+      - name: Validar secrets de produção
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+          LOG_HASH_SALT: ${{ secrets.LOG_HASH_SALT }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const required = [
+            "CLOUDFLARE_API_TOKEN",
+            "SESSION_SECRET",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GITHUB_CLIENT_ID",
+            "GITHUB_CLIENT_SECRET",
+            "LOG_HASH_SALT",
+          ];
+          const missing = required.filter((name) => !process.env[name]);
+          if (missing.length) {
+            console.error(`Secrets obrigatórios ausentes: ${missing.join(", ")}`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Build frontend para publicação
+        run: npm run build
 
       - name: Aplicar migrações D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler d1 migrations apply prawurl --remote --config wrangler.api.jsonc
 
       - name: Publicar API Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npm run deploy:api:production
 
       - name: Publicar Redirect Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npm run deploy:redirect:production
 
       - name: Atualizar secrets do API Worker
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
         run: |
-          node -e "const fs=require('fs'); const names=['SESSION_SECRET','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GITHUB_CLIENT_ID','GITHUB_CLIENT_SECRET']; fs.writeFileSync('/tmp/prawurl-api-secrets.json', JSON.stringify(Object.fromEntries(names.map((name)=>[name, process.env[name] || '']))));"
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          const names = ["SESSION_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"];
+          fs.writeFileSync("/tmp/prawurl-api-secrets.json", JSON.stringify(Object.fromEntries(names.map((name) => [name, process.env[name]]))));
+          NODE
           npx wrangler secret bulk /tmp/prawurl-api-secrets.json --config wrangler.api.jsonc
 
       - name: Atualizar secrets do Redirect Worker
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           LOG_HASH_SALT: ${{ secrets.LOG_HASH_SALT }}
         run: |
-          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/prawurl-redirect-secrets.json', JSON.stringify({ SESSION_SECRET: process.env.SESSION_SECRET || '', LOG_HASH_SALT: process.env.LOG_HASH_SALT || '' }));"
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          fs.writeFileSync("/tmp/prawurl-redirect-secrets.json", JSON.stringify({
+            SESSION_SECRET: process.env.SESSION_SECRET,
+            LOG_HASH_SALT: process.env.LOG_HASH_SALT,
+          }));
+          NODE
           npx wrangler secret bulk /tmp/prawurl-redirect-secrets.json --config wrangler.redirect.jsonc
 
       - name: Publicar Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npm run deploy:web:production
+
+  health:
+    name: Verificar produção
+    needs: deploy
+    if: ${{ needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verificar API com tentativas
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            response="$(curl --fail --silent --show-error --location --max-time 15 --retry 2 --retry-all-errors -H 'Accept: application/json' -H 'Cache-Control: no-cache' https://api.prawurl.com/health || true)"
+            if printf '%s' "$response" | jq -e '.ok == true and .service == "prawurl-api"' >/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check da API falhou após 12 tentativas."
+          exit 1
+
+      - name: Verificar site público
+        run: |
+          curl --fail --silent --show-error --location --max-time 20 --retry 5 --retry-all-errors -H 'Cache-Control: no-cache' -o /dev/null https://prawurl.com/
+
+      - name: Verificar dashboard
+        run: |
+          curl --fail --silent --show-error --location --max-time 20 --retry 5 --retry-all-errors -H 'Cache-Control: no-cache' -o /dev/null https://app.prawurl.com/app
+
+  rollback:
+    name: Rollback automático
+    needs: [validate, deploy, health]
+    if: ${{ always() && github.event_name == 'push' && needs.validate.result == 'success' && (needs.deploy.result == 'failure' || needs.health.result == 'failure') && github.event.before != '0000000000000000000000000000000000000000' && !contains(github.event.head_commit.message, '[auto-rollback]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout da versão anterior
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.before }}
+          fetch-depth: 0
+
+      - name: Preparar Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Instalar dependências da versão anterior
+        run: npm ci --include=dev --ignore-scripts --no-audit
+
+      - name: Build da versão anterior
+        run: npm run build
+
+      - name: Restaurar API Worker anterior
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:api:production
+
+      - name: Restaurar Redirect Worker anterior
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:redirect:production
+
+      - name: Restaurar Pages anterior
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:web:production
+
+      - name: Confirmar saúde após rollback
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --location --max-time 20 --retry 10 --retry-all-errors -H 'Accept: application/json' -H 'Cache-Control: no-cache' https://api.prawurl.com/health)"
+          printf '%s' "$response" | jq -e '.ok == true and .service == "prawurl-api"' >/dev/null
+          curl --fail --silent --show-error --location --max-time 20 --retry 5 --retry-all-errors -o /dev/null https://prawurl.com/
+          curl --fail --silent --show-error --location --max-time 20 --retry 5 --retry-all-errors -o /dev/null https://app.prawurl.com/app
+
+      - name: Registrar rollback exato no main
+        env:
+          EXPECTED_CURRENT_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ github.event.before }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          current_sha="$(git rev-parse origin/main)"
+          if [ "$current_sha" != "$EXPECTED_CURRENT_SHA" ]; then
+            echo "main mudou durante a recuperação; não sobrescrevendo alterações novas."
+            exit 1
+          fi
+          git checkout --quiet --detach "$EXPECTED_CURRENT_SHA"
+          git diff --binary "$TARGET_SHA" "$EXPECTED_CURRENT_SHA" | git apply --reverse
+          git add -A
+          if git diff --cached --quiet; then
+            echo "A árvore já coincide com a versão anterior; nenhum commit de rollback necessário."
+            exit 0
+          fi
+          git config user.name "prawurl-automation"
+          git config user.email "prawurl-automation@users.noreply.github.com"
+          git commit --no-edit -m "revert: rollback automático para $TARGET_SHA [auto-rollback]"
+          git -c http.extraheader="AUTHORIZATION: bearer $GITHUB_TOKEN" push origin HEAD:main

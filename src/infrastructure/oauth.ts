@@ -69,7 +69,10 @@ async function exchangeGoogle(code: string, config: OAuthConfig): Promise<OAuthP
     throw new Error("OAUTH_PROFILE_FAILED");
   }
 
-  const profile = (await profileResponse.json()) as { sub: string; email: string; name?: string; picture?: string };
+  const profile = (await profileResponse.json()) as { sub: string; email: string; email_verified?: boolean; name?: string; picture?: string };
+  if (!profile.email || profile.email_verified !== true) {
+    throw new Error("OAUTH_EMAIL_UNVERIFIED");
+  }
   return {
     provider: "google",
     providerAccountId: profile.sub,
@@ -106,9 +109,9 @@ async function exchangeGitHub(code: string, config: OAuthConfig): Promise<OAuthP
     throw new Error("OAUTH_PROFILE_FAILED");
   }
 
-  const user = (await userResponse.json()) as { id: number; name?: string; avatar_url?: string; email?: string };
+  const user = (await userResponse.json()) as { id: number; name?: string; avatar_url?: string };
   const emails = (await emailsResponse.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
-  const email = user.email ?? emails.find((item) => item.primary && item.verified)?.email ?? emails.find((item) => item.verified)?.email;
+  const email = emails.find((item) => item.primary && item.verified)?.email ?? emails.find((item) => item.verified)?.email;
 
   if (!email) {
     throw new Error("OAUTH_EMAIL_MISSING");
