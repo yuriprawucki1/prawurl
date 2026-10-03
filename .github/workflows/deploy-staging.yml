@@ -99,11 +99,11 @@ jobs:
       - name: Validar tipos
         run: npm run lint
 
-      - name: Rodar testes unitários
-        run: npm test
-
       - name: Build frontend
         run: npm run build
+
+      - name: Rodar testes unitários
+        run: npm test
 
       - name: Validar bundles dos Workers
         run: npm run build:workers

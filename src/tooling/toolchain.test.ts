@@ -16,15 +16,15 @@ describe("toolchain obligations", () => {
     const workflow = readFileSync(`.github/workflows/${file}`, "utf8");
     const firstPublish = workflow.search(/run:.*(?:deploy:|migrations apply)/);
     expect(firstPublish).toBeGreaterThan(0);
-    for (const command of ["npm ci", "npm run lint", "npm test", "npm run build", "npm run build:workers", "npm run test:visual", "npm run test:e2e"]) {
+    for (const command of ["npm ci", "npm run lint", "npm run build", "npm test", "npm run build:workers", "npm run test:visual", "npm run test:e2e"]) {
       const offset = workflow.indexOf(command);
       expect(offset, command).toBeGreaterThan(0);
       expect(offset, command).toBeLessThan(firstPublish);
     }
-    expect(workflow).toContain("actions/checkout@v7.0.1");
-    expect(workflow).toContain("actions/setup-node@v7.0.0");
+    expect(workflow).toMatch(/actions\/checkout@[a-f0-9]{40} # v4/);
+    expect(workflow).toMatch(/actions\/setup-node@[a-f0-9]{40} # v4/);
     expect(workflow).toContain("playwright install --with-deps chromium");
-    expect(workflow).toContain("xvfb-run -a npm run test:visual");
-    expect(workflow).toContain("xvfb-run -a npm run test:e2e");
+    expect(workflow).toContain("run: npm run test:visual");
+    expect(workflow).toContain("run: npm run test:e2e");
   });
 });

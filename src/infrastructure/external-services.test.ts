@@ -17,7 +17,7 @@ it.each(["google", "github"] as const)("OAuth %s preserves callback and state", 
 
 it("Google profile is read with exchanged bearer token", async () => {
   const outbound = vi.fn().mockResolvedValueOnce(Response.json({ access_token: "fixture-token" }))
-    .mockResolvedValueOnce(Response.json({ sub: "google-1", email: "google@example.test", name: "Google user" }));
+    .mockResolvedValueOnce(Response.json({ sub: "google-1", email: "google@example.test", email_verified: true, name: "Google user" }));
   vi.stubGlobal("fetch", outbound);
   expect(await exchangeOAuthCode("google", "fixture-code", config)).toEqual({ provider: "google", providerAccountId: "google-1", email: "google@example.test", name: "Google user", avatarUrl: null });
   expect(outbound.mock.calls[1][1].headers.authorization).toBe("Bearer fixture-token");
