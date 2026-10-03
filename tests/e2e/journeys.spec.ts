@@ -89,6 +89,17 @@ test("bulk actions and CSV selection", async ({ page, runtime }) => {
   // The mobile list uses cards rather than table rows.
   const select = page.getByRole("link", { name: /\/bulk-selected$/ }).locator("xpath=ancestor::tr | ancestor::label").getByRole("checkbox");
   await select.click();
+  // The baseline checked control uses the primary token for both fill and border.
+  const primaryColor = await select.evaluate(() => {
+    const swatch = document.createElement("span");
+    swatch.style.color = "hsl(var(--primary))";
+    document.body.appendChild(swatch);
+    const primary = getComputedStyle(swatch).color;
+    swatch.remove();
+    return primary;
+  });
+  await expect(select).toHaveCSS("background-color", primaryColor);
+  await expect(select).toHaveCSS("border-color", primaryColor);
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar selecionados" }).click();
   const download = await downloadPromise;

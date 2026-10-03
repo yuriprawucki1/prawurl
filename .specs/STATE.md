@@ -11,5 +11,5 @@
 ## Handoff
 
 Feature: dependency-refresh; base ad2de29; branch codex/dependency-refresh.
-Plano aprovado e checks derivados. Implementação e provas do autor concluídas; aguarda Verifier independente sobre todos os 28 checks após o commit. Publicação externa requer instrução específica.
+Plano aprovado e checks derivados. Rodada independente 1 encontrou lacuna C12 em limites de edição; testes ampliados e falha histórica preservada. Corrigida também a prioridade de bordas no Tailwind 4, com nova asserção antes vermelha e agora verde. Provas do autor: 75 Vitest, 2 layouts e 2 jornadas de lote verdes; aguarda rodada independente 2 com todas as provas e reinjeção das superfícies alteradas. Publicação externa requer instrução específica.
 Estado preexistente preservado: diretório `.agents/` não rastreado do usuário.

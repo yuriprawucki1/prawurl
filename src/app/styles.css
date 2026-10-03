@@ -92,10 +92,6 @@
   color-scheme: dark;
 }
 
-* {
-  border-color: hsl(var(--border));
-}
-
 body {
   margin: 0;
   background: hsl(var(--background));

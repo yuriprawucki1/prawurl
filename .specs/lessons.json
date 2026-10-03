@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "promote_threshold": 2,
+  "window_days": 45,
+  "quarantine_threshold": 2,
+  "next_id": 2,
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "surviving_mutant::teste limites compartilhados separadamente em cada schema de requisicao incluindo criacao e atualizacao",
+      "text": "Teste limites compartilhados separadamente em cada schema de requisição, incluindo criação e atualização.",
+      "signal": "surviving_mutant",
+      "scope": "validation",
+      "status": "candidate",
+      "features": [
+        "dependency-refresh"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".specs/features/dependency-refresh/verification-round-1.md:C12/F1 (validation)"
+      ],
+      "created": "2026-10-03T01:11:54Z",
+      "last_seen": "2026-10-03T01:11:54Z"
+    }
+  ]
+}

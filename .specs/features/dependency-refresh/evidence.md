@@ -14,11 +14,19 @@ Data: 02/10/2026 (America/Sao_Paulo). Ambiente: macOS, Node 24.18.0, npm 12.2.0.
 | npm run lint | exit 0 | exit 0; frontend, Workers e tooling, incluindo testes |
 | npm run build | exit 0 | exit 0; index.html e assets CSS/JS |
 | npm run build:workers | não havia script conjunto | API e redirect exit 0, dry-run, ambiente raiz explícito |
-| Vitest | 4 casos existentes verdes | 69 casos em 9 arquivos, 0 falhas |
+| Vitest | 4 casos existentes verdes | 75 casos em 9 arquivos, 0 falhas |
 | Playwright original | desktop e mobile verdes | 2 projetos verdes; arquivo layout.spec.ts idêntico à base |
 | Playwright jornadas novas | ausentes | 14 casos verdes, 7 jornadas em cada viewport |
 
 Depois de reforçar edição ativa e reativação exclusiva da seleção, repetidos os 69 casos Vitest, os 2 layouts e as 2 jornadas de lote, todos verdes. O Verifier repetirá o conjunto inteiro em HEAD, incluindo instalação e navegador.
+
+## Correções após a primeira revisão
+
+A rodada independente 1 (e6c444b) encontrou C12 sem prova do limite de tags na edição: um mutante que aceitava 11 tags sobreviveu. Os testes agora exercitam limites e normalização separadamente em criação e edição, sem alterar os schemas nem reduzir as asserções anteriores. A falha e a lição foram preservadas em `verification-round-1.md` e `.specs/LESSONS.md`.
+
+Um teste adicional exige preenchimento e borda do checkbox selecionado na cor do token primary da base. Antes da correção ele falhou: borda cinza `rgb(206, 213, 222)` em vez de verde `rgb(12, 125, 103)`. Removido o reset universal duplicado fora de `@layer`; o reset em `@layer base` continua presente e as utilities voltam a ter prioridade. A espera do Playwright observa o fim da transição CSS existente.
+
+Após estas correções, lint/build, 75 casos Vitest, os 2 layouts originais e as 2 jornadas de lote passaram. A rodada 2 repetirá todas as provas em seu commit e reinjetará falhas nas superfícies alteradas.
 
 ## Migrações relevantes
 
