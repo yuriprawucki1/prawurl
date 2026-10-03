@@ -11,5 +11,5 @@
 ## Handoff
 
 Feature: dependency-refresh; base ad2de29; branch codex/dependency-refresh.
-Plano aprovado e checks derivados. Rodada independente 1 encontrou lacuna C12 em limites de edição; testes ampliados e falha histórica preservada. Corrigida também a prioridade de bordas no Tailwind 4, com nova asserção antes vermelha e agora verde. Provas do autor: 75 Vitest, 2 layouts e 2 jornadas de lote verdes; aguarda rodada independente 2 com todas as provas e reinjeção das superfícies alteradas. Publicação externa requer instrução específica.
+Concluída. Rodada independente 2 PASS no commit de implementação 8b6c8b8ae60209c2759d719158b41b3f40d05782: 28/28 checks provados, 75 Vitest + 2 layouts + 14 E2E = 91 testes verdes, zero falhas/skips. Instalação, árvore, audit zero, versões, tipos, frontend e os dois Workers dry-run passaram. Os dois faults reinjetados foram detectados; 13 pares de capturas preservam composição/conteúdo. Gate exit 0, zero erros/warnings. A lacuna C12 da rodada 1 foi corrigida e sua lição e relatório histórico preservados. Relatórios finais e este encerramento documental não alteram código, dependências ou testes validados. Publicação externa requer instrução específica.
 Estado preexistente preservado: diretório `.agents/` não rastreado do usuário.

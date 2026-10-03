@@ -31,3 +31,7 @@ Evidence:
 - Read-only source/declaration inspection with `rg`, `cat`, `sed`, and `nl`.
 
 No project tests, builds, installs, Vite servers, browsers, or Workers were started.
+
+## Supplemental fix review
+
+Read-only review by `/root/mechanical_review` (gpt-6-luna), range `e6c444b6..8b6c8b8ae60209c2759d719158b41b3f40d05782`: no concrete introduced risk found. Existing validation assertions remain and the same boundaries now exercise both create and update schemas. The CSS removes only the unlayered universal border reset, retaining the reset in `@layer base` so component utilities can win the cascade. The E2E assertions check computed fill and border against primary while preserving selection, export, disable/re-enable and unselected-link assertions. No tests or installs were run in this supplemental review, and no files were edited by this reviewer. Recorded here by root from the reviewer's returned conclusion.

@@ -167,6 +167,8 @@ Uma implementação por root. Arquivos existentes potencialmente modificados med
 
 Status do autor: `npm ci`, árvore, audit, tipos, build e dry-run passaram; 69 casos Vitest, 14 jornadas E2E e os 2 projetos da suíte original passaram antes da primeira revisão. O Verifier encontrou uma lacuna C12: testes ampliados para os limites na edição; adicionada prova da borda selecionada e corrigido reset CSS duplicado. Depois das correções, 75 casos Vitest, os 2 layouts e os 2 casos de lote modificados passaram. O Verifier executará todas as provas novamente no HEAD final e reavaliará as superfícies alteradas. Provas agrupadas mostram todos os testes nomeados; filtros individuais permanecem disponíveis.
 
+Encerramento: Verifier rodada 2 PASS em 8b6c8b8ae60209c2759d719158b41b3f40d05782, provas completas reexecutadas (91 testes, zero falhas/skips), 28/28 checks, 2/2 defeitos detectados, gate exit 0. Claims, sets e Test policy aprovados permanecem inalterados.
+
 Notas de harness: seletores dos testes novos distinguem as versões mobile/desktop ocultas; QR compara os módulos efetivamente desenhados, não os bytes de compressão PNG. Workers usam `createTestHarness` para compartilhar D1/KV no mesmo runtime, evitando abertura concorrente do SQLite por três processos. Nenhuma asserção da suíte original foi editada, reduzida ou desabilitada. Um ensaio E2E foi invalidado por recarregamento do Vite durante edição de package.json e repetido com arquivos estáveis.
 
-Evidência detalhada do autor: `evidence.md`. O encerramento depende de `verification.md` independente e do completion gate, ainda pendentes.
+Evidência detalhada do autor: `evidence.md`. Encerramento independente: `verification.md`, PASS, completion gate exit 0.

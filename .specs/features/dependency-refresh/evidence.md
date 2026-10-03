@@ -28,6 +28,12 @@ Um teste adicional exige preenchimento e borda do checkbox selecionado na cor do
 
 Após estas correções, lint/build, 75 casos Vitest, os 2 layouts originais e as 2 jornadas de lote passaram. A rodada 2 repetirá todas as provas em seu commit e reinjetará falhas nas superfícies alteradas.
 
+## Resultado independente final
+
+Rodada 2 PASS em `8b6c8b8ae60209c2759d719158b41b3f40d05782`: todos os comandos completos repetidos; 28/28 checks, 75 Vitest e 16 Playwright verdes, zero falhas/skips. Os dois defeitos reinjetados nesta rodada foram detectados. Os 13 pares de capturas foram abertos novamente após o fix CSS. Gate repetido pelo autor: exit 0, zero erros/warnings. A fonte do julgamento é `verification.md`, escrito pelo Verifier, e a primeira rodada permanece no arquivo histórico.
+
+A revisão suplementar read-only com gpt-6-luna também aprovou o fix, sem enfraquecimento de asserções nem risco concreto identificado. Seu adendo está em `mechanical-review.md`.
+
 ## Migrações relevantes
 
 - Tailwind 4 com plugin Vite; removido PostCSS redundante. Tokens, temas, bordas, sombras, outline, altura de linhas e hover ao toque mantêm o comportamento da base. `rounded-sm` conserva a configuração customizada de raio, não o default descrito no guia de migração.
