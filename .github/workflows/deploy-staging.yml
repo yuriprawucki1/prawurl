@@ -91,7 +91,7 @@ jobs:
         run: grype sbom:"$RUNNER_TEMP/prawurl-staging-lock.sbom.json" --fail-on low
 
       - name: Gerar SBOM da árvore instalada
-        run: syft scan dir:. --exclude './.git/**' --exclude './dist/**' -o cyclonedx-json="$RUNNER_TEMP/prawurl-staging-tree.sbom.json"
+        run: syft scan dir:. --exclude './.git/**' --exclude './dist/**' --exclude './node_modules/**' -o cyclonedx-json="$RUNNER_TEMP/prawurl-staging-tree.sbom.json"
 
       - name: Auditar SBOM da árvore instalada
         run: grype sbom:"$RUNNER_TEMP/prawurl-staging-tree.sbom.json" --fail-on low
