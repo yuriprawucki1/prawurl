@@ -1,0 +1,118 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PrawURL Public API",
+    "version": "1.0.0",
+    "description": "Public health and short-link resolution endpoints for PrawURL."
+  },
+  "servers": [
+    { "url": "https://api.prawurl.com" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Check API health",
+        "responses": {
+          "200": {
+            "description": "The API is healthy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/resolve/{alias}": {
+      "get": {
+        "operationId": "resolveShortLink",
+        "summary": "Resolve a public short-link alias",
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The alias resolution result.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Resolution" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/resolve/{alias}/unlock": {
+      "post": {
+        "operationId": "unlockShortLink",
+        "summary": "Unlock a password-protected short link",
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["password"],
+                "properties": { "password": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The unlock or resolution result.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Resolution" }
+              }
+            }
+          },
+          "400": { "description": "The password is missing or invalid." }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "required": ["ok", "service", "checkedAt"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "service": { "const": "prawurl-api" },
+          "checkedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Resolution": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["redirect", "password_required", "blocked", "not_found"]
+          },
+          "alias": { "type": "string" },
+          "linkId": { "type": ["string", "null"] },
+          "destinationUrl": { "type": "string", "format": "uri" },
+          "redirectCode": { "type": "integer", "enum": [301, 302] },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
