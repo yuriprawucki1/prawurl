@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrawURL Public API</title>
+  </head>
+  <body>
+    <main>
+      <h1>PrawURL Public API</h1>
+      <p>The public API is hosted at <code>https://api.prawurl.com</code>.</p>
+      <p>For the machine-readable description, see <a href="/openapi.json">OpenAPI 3.1</a>.</p>
+      <h2>Health</h2>
+      <p><code>GET /health</code> returns the API service health status.</p>
+      <h2>Resolve a short link</h2>
+      <p><code>GET /public/resolve/{alias}</code> returns the redirect, password requirement, block status, or not-found result for an alias.</p>
+      <h2>Unlock a short link</h2>
+      <p><code>POST /public/resolve/{alias}/unlock</code> accepts a JSON object with a <code>password</code> string.</p>
+    </main>
+  </body>
+</html>

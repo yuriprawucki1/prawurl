@@ -1,0 +1,30 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://api.prawurl.com/",
+      "item": [
+        { "href": "https://api.prawurl.com/health" },
+        {
+          "href": "https://api.prawurl.com/public/resolve/sample",
+          "title": "Resolve an alias; replace sample with the alias to look up"
+        },
+        {
+          "href": "https://api.prawurl.com/public/resolve/sample/unlock",
+          "title": "Unlock an alias; replace sample with the alias to unlock"
+        }
+      ],
+      "service-desc": [
+        {
+          "href": "https://prawurl.com/openapi.json",
+          "type": "application/vnd.oai.openapi+json;version=3.1"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://prawurl.com/api-docs.html",
+          "type": "text/html"
+        }
+      ]
+    }
+  ]
+}
