@@ -138,7 +138,9 @@ OAuth callback URLs:
 
 Use a feature branch → PR to `staging` → healthy staging deployment → PR from `staging` to `main` → healthy production deployment.
 
-The workflow names, triggers, validation gates, promotion rules and recovery procedure are documented in [`docs/release-flow.md`](docs/release-flow.md).
+Open changes through pull requests and request `@codex review` on each one. The Codex review is a manual process step: the integration does not publish a required status check that can block a merge. The `staging` branch requires `Validar alteração / Qualidade e segurança`; `main` requires that check plus `Confirmar promoção de staging`. Both branches require up-to-date checks and resolved review conversations, and block administrator bypass, force pushes and deletion. No separate human approval is required; only the repository owner or collaborators with write permission can merge.
+
+The workflow names, triggers, validation gates, promotion rules, review policy and recovery procedure are documented in [`docs/release-flow.md`](docs/release-flow.md).
 
 ## Deploy
 
