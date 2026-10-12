@@ -66,6 +66,15 @@ O monitor consulta as publicações saudáveis do workflow de produção. Monito
 
 Comandos locais explicitamente identificados por ambiente continuam disponíveis (`deploy:staging`, `deploy:production`). Eles não oferecem os gates ou o histórico de evidências do GitHub Actions; use PRs e CD para o fluxo normal.
 
+## Revisão e proteção de branches
+
+- Todo trabalho normal, inclusive documentação, começa em uma branch de feature e segue por pull request para `staging`.
+- A regra de `staging` exige o check `Validar alteração / Qualidade e segurança`. A regra de `main` exige esse check e `Confirmar promoção de staging`.
+- As duas branches exigem checks atualizados antes do merge e resolução das conversas do pull request. Administradores não podem ignorar as regras; force-push e exclusão das branches são bloqueados.
+- Não há aprovação humana separada obrigatória. O merge fica disponível para o proprietário e colaboradores com permissão de escrita ou superior.
+- Solicite `@codex review` em cada PR, avalie o resultado e resolva os apontamentos aplicáveis. A integração não oferece um check obrigatório do Codex; portanto, essa solicitação é uma etapa do processo, não um bloqueio técnico do merge.
+- Promova somente por PR de `staging` para `main`, com merge commit, depois que o deploy e os health checks de staging estiverem saudáveis. Se `main` tiver commits ausentes de `staging`, sincronize `main` em `staging` primeiro.
+
 ## Diagnóstico da promoção de dependency-refresh
 
 A promoção no PR #19 travou por conflitos entre main e staging em `package.json`, `package-lock.json` e nos dois workflows de deploy. As verificações também divergiam:
